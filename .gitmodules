@@ -1,23 +1,23 @@
 [submodule "libraries/Kaleidoscope"]
-	path = libraries/Kaleidoscope
+	path = Kaleidoscope
 	url = git@github.com:Dygmalab/Kaleidoscope-Dygma.git
 [submodule "libraries/UpgradeKeyscanner"]
-	path = libraries/UpgradeKeyscanner
+	path = UpgradeKeyscanner
 	url = git@github.com:Dygmalab/KaleidoscopePluginKeyScannerUpgrade.git
 [submodule "libraries/Communications"]
-	path = libraries/Communications
+	path = Communications
 	url = git@github.com:Dygmalab/DefyCommunications.git
 	branch = of-rf_host_lib_integration
 [submodule "libraries/Arduino"]
-	path = libraries/Arduino
+	path = Arduino
 	url = git@github.com:Dygmalab/Arduino_NRF5.git
 [submodule "libraries/Ble_composite_dev"]
-	path = libraries/Ble_composite_dev
+	path = Ble_composite_dev
 	url = git@github.com:Dygmalab/Ble_composite_dev.git
 [submodule "libraries/rf_host_device/rf_host_device"]
-	path = libraries/rf_host_device/rf_host_device
+	path = rf_host_device/rf_host_device
 	url = git@github.com:Dygmalab/rf_host_device.git
 	branch = main
 [submodule "libraries/NeuronLedLibrary"]
-	path = libraries/NeuronLedLibrary
+	path = NeuronLedLibrary
 	url = git@github.com:Dygmalab/NeuronLedLibrary.git

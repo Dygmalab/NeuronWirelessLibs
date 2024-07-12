@@ -42,15 +42,17 @@ extern "C"
 }
 #endif
 
+
 class Watchdog_timer
 {
-public:
-    void init(void);
-    void reset(void);
+    public:
+        void init(void);
+        void reset(void);
 
-private:
-    nrf_drv_wdt_channel_id wdt_channel_id;
-    bool inited;
+    private:
+        nrf_drv_wdt_channel_id wdt_channel_id;
+        bool inited;
 };
 
-#endif // __WATCHDOG_TIMER_H__
+
+#endif  // __WATCHDOG_TIMER_H__

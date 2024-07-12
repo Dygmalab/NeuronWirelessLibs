@@ -4,6 +4,8 @@
 
     Official documentation page:
     https://infocenter.nordicsemi.com/topic/sdk_nrf5_v17.1.0/group__nrfx__twim.html
+
+    Author: Juan Hauara @JuanHauara
 */
 
 
