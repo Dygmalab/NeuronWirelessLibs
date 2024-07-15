@@ -1,4 +1,4 @@
-/* -*- mode: c++ -*-
+/*
  * kaleidoscope::plugin::Ble_manager -- Manage Bluetooth low energy status and functions in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  *
- * Author: Alejandro Parcet, @alexpargon
- *
+ * Author: Gustavo Gomez Lopez @Noteolvides
+ * Mantainer: Juan Hauara @JuanHauara
  */
 
 #include "Ble_manager.h"

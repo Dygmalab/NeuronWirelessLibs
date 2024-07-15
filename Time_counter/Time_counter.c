@@ -23,8 +23,6 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * Author: Juan Hauara @JuanHauara
- * Date: 08/22/2022
- *
  */
 
 #include "Time_counter.h"
