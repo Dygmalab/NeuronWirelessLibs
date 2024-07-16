@@ -87,7 +87,7 @@ class Ble_flash_data
 {
   public:
     Ble_connections ble_connections[BLE_CONNECTIONS_COUNT];
-    char defy_ble_name[BLE_DEVICE_NAME_LEN];
+    char keyb_ble_name[BLE_DEVICE_NAME_LEN];
     uint8_t currentChannel;
     bool forceBle;
 
@@ -100,7 +100,7 @@ class Ble_flash_data
 
         currentChannel = 0;
         forceBle = false;
-        strcpy(defy_ble_name, DEVICE_NAME);
+        strcpy(keyb_ble_name, DEVICE_NAME);
     }
 };
 

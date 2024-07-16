@@ -57,9 +57,9 @@ extern "C"
 #endif
 
 
-#define FLASH_STORAGE_DEBUG_READ 1
-#define FLASH_STORAGE_DEBUG_ERASE_PAGE 1
-#define FLASH_STORAGE_DEBUG_WRITE 1
+#define FLASH_STORAGE_DEBUG_READ            1
+#define FLASH_STORAGE_DEBUG_ERASE_PAGE      1
+#define FLASH_STORAGE_DEBUG_WRITE           1
 
 /*
     The NRF52833 has 128 pages of 4KB each one.

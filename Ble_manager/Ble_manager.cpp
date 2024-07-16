@@ -176,7 +176,7 @@ EventHandlerResult BleManager::onSetup(void)
 void BleManager::update_channel_and_name(void)
 {
     set_current_channel(ble_flash_data.currentChannel);
-    set_device_name(ble_flash_data.defy_ble_name);
+    set_device_name(ble_flash_data.keyb_ble_name);
     pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
 
     if (active_connection_peer_id == PM_PEER_ID_INVALID) // SI no tengo ningun dispositivo en el canal ejecuto el advertising con lista blanca para qu cualquier dispositivo lo encuentre
@@ -840,7 +840,7 @@ EventHandlerResult BleManager::onFocusEvent(const char *command)
     //            NRF_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
     //#endif
     //
-    //            for (const auto &device_name_letter : ble_flash_data.defy_ble_name)
+    //            for (const auto &device_name_letter : ble_flash_data.keyb_ble_name)
     //            {
     //                ::Focus.send((uint8_t)device_name_letter);
     //            }
@@ -851,7 +851,7 @@ EventHandlerResult BleManager::onFocusEvent(const char *command)
     //            NRF_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
     //#endif
     //
-    //            for (auto &device_name_letter : ble_flash_data.defy_ble_name)
+    //            for (auto &device_name_letter : ble_flash_data.keyb_ble_name)
     //            {
     //                uint8_t aux;
     //                ::Focus.read(aux);
