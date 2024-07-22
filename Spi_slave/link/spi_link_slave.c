@@ -38,6 +38,18 @@ typedef enum
     SPILS_STATE_DATA_SENDING,
 } spils_state_t;
 
+typedef struct
+{
+    uint8_t * data;
+
+    uint16_t size;
+    uint16_t read_pos;
+    uint16_t write_pos;
+
+    uint16_t loadsize;
+    uint16_t freesize;
+} buffer_t;
+
 struct spils
 {
     spils_state_t state;
@@ -50,13 +62,9 @@ struct spils
 //    hal_mcu_gpio_t * p_pin_int;  /* Interrupt signal */
 
     /* Buffers */
-//    buffer_t * p_buffer_in_1;         /* The allocated buffer space for incoming data */
-//    buffer_t * p_buffer_in_2;         /* The allocated buffer space for incoming data */
     buffer_t * p_buffer_in_cache;     /* The pointer for input buffer into which the data is currently being transmitted in */
     buffer_t * p_buffer_in;           /* The pointer for input buffer which can be read from superior layers */
 
-//    buffer_t * p_buffer_out_1;        /* The allocated buffer space for outgoing data */
-//    buffer_t * p_buffer_out_2;        /* The allocated buffer space for outgoing data */
     buffer_t * p_buffer_out_cache;    /* The pointer for output buffer from which the data is currently being transmitted out */
     buffer_t * p_buffer_out;          /* The pointer for output buffer which can be written from superior layers */
 
@@ -86,6 +94,9 @@ static result_t _transfer_start( spils_t * p_spils, spils_state_t state );
 static void _listening_start( spils_t * p_spils, spil_mess_type_t result_mess_type );
 static void _data_receive_start( spils_t * p_spils, spil_mess_type_t result_mess_type );
 static void _data_send_start( spils_t * p_spils );
+
+/* Prototypes */
+static result_t buffer_init( buffer_t ** pp_buffer, uint8_t buffer_size );
 
 static result_t _spi_hal_init( spils_t * p_spils, const spils_conf_t * p_conf )
 {
@@ -149,42 +160,23 @@ static result_t _gpio_init( spils_t * p_spils, const spils_conf_t * p_conf )
 static result_t _buffers_init( spils_t * p_spils, const spils_conf_t * p_conf )
 {
     result_t result = RESULT_ERR;
-    buffer_conf_t buffer_config =
-    {
-        .data = NULL,
-        .size = p_conf->message_size_max + sizeof( spil_mess_header_t ) + 1,
-    };
 
-    result = buffer_init( &p_spils->p_buffer_in_cache, &buffer_config );
+    ASSERT_DYGMA( p_conf->message_size_max <= UINT8_MAX - sizeof( spil_mess_header_t ), "FATAL: SPI link message_size_max exceeds the maximum possible value" );
+
+    /* Compute the size of buffers */
+    uint8_t buffer_size = p_conf->message_size_max + sizeof( spil_mess_header_t );
+
+    result = buffer_init( &p_spils->p_buffer_in_cache, buffer_size );
     EXIT_IF_ERR( result, "buffer_init for buffer_in_cache failed" );
 
-    result = buffer_init( &p_spils->p_buffer_in, &buffer_config );
+    result = buffer_init( &p_spils->p_buffer_in, buffer_size );
     EXIT_IF_ERR( result, "buffer_init for buffer_in failed" );
 
-    result = buffer_init( &p_spils->p_buffer_out_cache, &buffer_config );
+    result = buffer_init( &p_spils->p_buffer_out_cache, buffer_size );
     EXIT_IF_ERR( result, "buffer_init for buffer_out_cache failed" );
 
-    result = buffer_init( &p_spils->p_buffer_out, &buffer_config );
+    result = buffer_init( &p_spils->p_buffer_out, buffer_size );
     EXIT_IF_ERR( result, "buffer_init for p_buffer_out failed" );
-
-//    result = buffer_init( &p_spils->buffer_in_1, &buffer_config );
-//    EXIT_IF_ERR( result, "buffer_init for buffer_in_1 failed" );
-//
-//    result = buffer_init( &p_spils->buffer_in_2, &buffer_config );
-//    EXIT_IF_ERR( result, "buffer_init for buffer_in_2 failed" );
-//
-//    result = buffer_init( &p_spils->buffer_out_1, &buffer_config );
-//    EXIT_IF_ERR( result, "buffer_init for buffer_out_1 failed" );
-//
-//    result = buffer_init( &p_spils->buffer_out_2, &buffer_config );
-//    EXIT_IF_ERR( result, "buffer_init for buffer_out_2 failed" );
-//
-//    /* Split the buffers to their initial roles */
-//    p_spils->buffer_in_cache = p_spils->buffer_in_1;
-//    p_spils->buffer_in = p_spils->buffer_in_2;
-//
-//    p_spils->buffer_out_cache = p_spils->buffer_out_1;
-//    p_spils->buffer_out = p_spils->buffer_out_2;
 
 _EXIT:
     return result;
@@ -363,6 +355,156 @@ static result_t _int_signal_reset( spils_t * p_spils )
 /*************************/
 /*        Buffers        */
 /*************************/
+
+static INLINE void buffer_clear( buffer_t * p_buffer )
+{
+    p_buffer->read_pos = 0;
+    p_buffer->write_pos = 0;
+
+    p_buffer->loadsize = 0;
+    p_buffer->freesize = p_buffer->size;
+}
+
+static result_t buffer_init( buffer_t ** pp_buffer, uint8_t buffer_size )
+{
+    buffer_t * p_buffer;
+
+    /* Allocate the instance */
+    p_buffer = heap_alloc( sizeof( buffer_t ) );
+
+    p_buffer->size = buffer_size;
+    p_buffer->data = heap_alloc( p_buffer->size );
+
+    buffer_clear( p_buffer );
+
+    *pp_buffer = p_buffer;
+
+    return RESULT_OK;
+}
+
+static void buffer_update_read_pos( buffer_t * p_buffer, int16_t len )
+{
+    if ( len == 0 )
+    {
+        return;
+    }
+
+    p_buffer->read_pos = ( uint16_t )( ( int16_t )p_buffer->read_pos + len );
+
+    /* Update buffer sizes */
+    p_buffer->loadsize = ( uint16_t )( ( int16_t )p_buffer->loadsize - len );
+    p_buffer->freesize = ( uint16_t )( ( int16_t )p_buffer->freesize + len );
+}
+
+static void buffer_update_write_pos( buffer_t * p_buffer, int16_t len )
+{
+    if ( len == 0 )
+    {
+        return;
+    }
+
+    p_buffer->write_pos = ( uint16_t )( ( int16_t )p_buffer->write_pos + len );
+
+    /* Update buffer sizes */
+    p_buffer->loadsize = ( uint16_t )( ( int16_t )p_buffer->loadsize + len );
+    p_buffer->freesize = ( uint16_t )( ( int16_t )p_buffer->freesize - len );
+}
+
+static INLINE uint8_t buffer_get_loadsize( buffer_t * p_buffer )
+{
+    return p_buffer->loadsize;
+}
+
+static void buffer_insert_data( buffer_t * _buffer, const uint8_t data[], uint16_t write_pos, uint16_t len )
+{
+    /*
+     * NOTE: Assert could be here. However, there are currently other checks in the superior functions which ensure the buffer does not get overflown
+     */
+
+    /* Optimize for speed */
+    if ( len == 1 )
+    {
+        _buffer->data[write_pos] = data[0];
+    }
+    else if ( len != 0 )
+    {
+        memcpy( _buffer->data + write_pos, data, len );
+    }
+}
+
+static result_t buffer_add( buffer_t * p_buffer, const uint8_t data[], uint16_t len )
+{
+    /* Check the size */
+    if ( len > p_buffer->freesize )
+    {
+        return RESULT_ERR;
+    }
+    else
+    {
+        buffer_insert_data( p_buffer, data, p_buffer->write_pos, len );
+    }
+
+    /* Update write position */
+    buffer_update_write_pos( p_buffer, len );
+
+    return RESULT_OK;
+}
+
+static result_t buffer_get_from_position( buffer_t * p_buffer, uint16_t from_position, uint8_t * data, uint16_t len )
+{
+    ASSERT_DYGMA( ( data != NULL ), "buffer_get target is NULL!" );
+
+    /* Check the size */
+    if ( len > p_buffer->loadsize )
+    {
+        return RESULT_ERR;
+    }
+    /* Optimizing for speed */
+    else if ( len == 1 )
+    {
+        *data = p_buffer->data[ from_position ];
+    }
+    else if ( len != 0 )
+    {
+        memcpy( data, p_buffer->data + from_position, len );
+    }
+
+    return RESULT_OK;
+}
+
+static result_t buffer_get( buffer_t * p_buffer, uint8_t * data, uint16_t len )
+{
+    return buffer_get_from_position( p_buffer, p_buffer->read_pos, data, len );
+}
+
+static result_t buffer_get_and_discard( buffer_t * p_buffer, uint8_t * data, uint16_t len )
+{
+    result_t result = RESULT_ERR;
+
+    result = buffer_get( p_buffer, data, len );
+    EXIT_IF_ERR( result, "buffer_get failed" );
+
+    buffer_update_read_pos( p_buffer, len );
+
+_EXIT:
+    return result;
+}
+
+static INLINE uint8_t * buffer_get_load_space_pointer( buffer_t * p_buffer, uint16_t offset )
+{
+    return &p_buffer->data[ p_buffer->read_pos + offset ];
+}
+
+static INLINE uint8_t * buffer_get_free_space_pointer( buffer_t * p_buffer )
+{
+    return &p_buffer->data[ p_buffer->write_pos ];
+}
+
+/* Returns the size either "from write_pos to read_pos" or "from write_pos to the end of data space"  */
+static uint16_t buffer_get_free_space_line_size( const buffer_t * p_buffer )
+{
+    return p_buffer->size - p_buffer->write_pos;
+}
 
 static INLINE void _buffer_recycle( buffer_t * p_buffer )
 {
