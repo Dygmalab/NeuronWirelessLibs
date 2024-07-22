@@ -508,41 +508,6 @@ _EXIT:
     return result;
 }
 
-static result_t _mess_compose_buffer( spils_t * p_spils, buffer_t * p_buffer_to, buffer_t * p_buffer_from )
-{
-    result_t result = RESULT_ERR;
-    spil_mess_data_t * p_mess_data;
-    uint16_t buffer_from_loadsize;
-    uint8_t data_len;
-
-    /* Determine the amount of data to be transferred */
-    buffer_from_loadsize = buffer_get_loadsize( p_buffer_from );
-    data_len = ( buffer_from_loadsize <= p_spils->message_size_max ) ? buffer_from_loadsize : p_spils->message_size_max;
-
-    /* Recycle the buffer first */
-    _buffer_recycle( p_buffer_to );
-
-    /* Prepare the message */
-    p_mess_data = (spil_mess_data_t *)buffer_get_free_space_pointer( p_buffer_to );
-
-    p_mess_data->head.len = sizeof( spil_mess_data_t ) + data_len;
-    p_mess_data->head.type = SPIL_MESS_TYPE_DATA;
-
-    buffer_update_write_pos( p_buffer_to, sizeof( spil_mess_header_t ) );
-
-    if( p_buffer_from != NULL && buffer_get_loadsize(p_buffer_from) != 0 )
-    {
-        result = buffer_move( p_buffer_from, p_buffer_to, data_len );
-        ASSERT_DYGMA( result == RESULT_OK, "SPI slave driver output data exceedes available space" );
-        EXIT_IF_ERR( result, "buffer_move failed" );
-    }
-
-    return RESULT_OK;
-
-_EXIT:
-    return result;
-}
-
 /*************************/
 /*       Transfer        */
 /*************************/
@@ -957,44 +922,6 @@ bool_t spils_data_read_available( spils_t * p_spils )
     return p_spils->data_in_available;
 }
 
-result_t spils_buffer_read( spils_t * p_spils, buffer_t * p_buffer )
-{
-    result_t result = RESULT_ERR;
-
-    if( p_spils->data_in_available == false )
-    {
-        return RESULT_OK;
-    }
-
-    /* Try to lock the input data stream */
-    if ( _mutex_in_trylock( p_spils ) == false )
-    {
-        return RESULT_BUSY;
-    }
-
-    /* Get the data. */
-    result = buffer_move_any( p_spils->p_buffer_in, p_buffer, NULL );
-    EXIT_IF_ERR( result, "buffer_get_and_discard failed." );
-
-    /* Recycle the buffer_in */
-    _buffer_recycle( p_spils->p_buffer_in );
-    p_spils->data_in_available = false;
-
-    /* Possibly move the cache */
-    if( p_spils->line_in_busy == true )
-    {
-        _buffer_in_cache_swap( p_spils );
-        p_spils->data_in_available = true;
-        p_spils->line_in_busy = false;
-    }
-
-_EXIT:
-    /* Unlock the input stream */
-    _mutex_in_unlock( p_spils );
-
-    return result;
-}
-
 result_t spils_data_read( spils_t * p_spils, uint8_t * p_data, uint16_t * p_data_size )
 {
     result_t result = RESULT_ERR;
@@ -1052,56 +979,6 @@ result_t spils_data_send( spils_t * p_spils, const uint8_t * p_data, uint16_t da
 
     /* Compose the data message */
     result = _mess_compose_data( p_spils, p_spils->p_buffer_out, p_data, data_size );
-    EXIT_IF_ERR( result, "_mess_compose_data failed" );
-    p_spils->data_out_available = true;
-
-    /* WARNING: POSSIBLE HAZARD HERE
-     * Setting the INT signal here may result in undesired and wrong signaling in case the SPI interrupt comes
-     * before the INT signal is actually set. After the interrupt, the INT signal should be reset until the next
-     * _spi_slave_buffers_set_done_handler. The SPI master will then be mistaken and might try a transfer which
-     * will be ignored due to the SPI slave being configured still.
-     *
-     * Mutex does not solve this situation nor temporarily disabling the SPI interrupt.
-     *
-     * This situation is the choice whether we will be asynchronously signaling the new available data or not.
-     * We will have to watch the SPI slave behavior and see how critical this issue could be.
-     *
-     * SUGGESTED SOLUTION: Forcefully finishing the current transfer process (Is it possible? What happens if the data
-     *                     is actually in the middle of the transition? ) and invoking the transfer_done handler to
-     *                     set a new transfer and the INT signal accordingly.
-     *                     This way there would be still some ignored messages during the SPI slave transfer reconfiguration,
-     *                     but the INT signal would be handled correctly.
-     */
-
-    if ( p_spils->state == SPILS_STATE_LISTENING )
-    {
-        _int_signal_set( p_spils );
-    }
-
-_EXIT:
-    /* Unlock the output stream */
-    _mutex_out_unlock( p_spils );
-
-    return result;
-}
-
-result_t spils_buffer_send( spils_t * p_spils, buffer_t * p_buffer )
-{
-    result_t result = RESULT_ERR;
-
-    if( p_spils->data_out_available == true )
-    {
-        return RESULT_BUSY;
-    }
-
-    /* Try to lock the output data stream */
-    if ( _mutex_out_trylock( p_spils ) == false )
-    {
-        return RESULT_BUSY;
-    }
-
-    /* Compose the data message */
-    result = _mess_compose_buffer( p_spils, p_spils->p_buffer_out, p_buffer );
     EXIT_IF_ERR( result, "_mess_compose_data failed" );
     p_spils->data_out_available = true;
 

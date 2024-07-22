@@ -79,9 +79,7 @@ typedef struct spils spils_t;
 
 extern result_t spils_init( spils_t ** pp_spils, const spils_conf_t * p_conf );
 extern bool_t spils_data_read_available( spils_t * p_spils );
-extern result_t spils_buffer_read( spils_t * p_spils, buffer_t * p_buffer );
 extern result_t spils_data_read( spils_t * p_spils, uint8_t * p_data, uint16_t * p_data_size );
-extern result_t spils_buffer_send( spils_t * p_spils, buffer_t * p_buffer );
 extern result_t spils_data_send( spils_t * p_spils, const uint8_t * p_data, uint16_t data_size );
 
 #ifdef __cplusplus
