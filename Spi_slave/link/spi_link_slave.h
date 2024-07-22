@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#include "middleware.h"
+#include "dl_middleware.h"
 #include "halsep/hal_mcu_gpio.h"
 #include "halsep/hal_mcu_spi.h"
 
@@ -61,8 +61,10 @@ typedef struct
     /* HAL */
     spils_spi_hal_conf_t spi;
 
+
     /* GPIO */
-    hal_mcu_gpio_pin_t pin_int;  /* Interrupt signal */
+    bool_t pin_int_enable;
+//    hal_mcu_gpio_pin_t pin_int;     /* INT output pin. Will be used only if the pin_int_enable is true */
 
     /* Messages */
     uint8_t message_size_max;

@@ -46,7 +46,8 @@ struct spils
     hal_mcu_spi_t * p_spi;
 
     /* GPIO */
-    hal_mcu_gpio_t * p_pin_int;  /* Interrupt signal */
+    bool_t pin_int_enabled;
+//    hal_mcu_gpio_t * p_pin_int;  /* Interrupt signal */
 
     /* Buffers */
 //    buffer_t * p_buffer_in_1;         /* The allocated buffer space for incoming data */
@@ -112,22 +113,36 @@ _EXIT:
 
 static result_t _gpio_init( spils_t * p_spils, const spils_conf_t * p_conf )
 {
-    result_t result = RESULT_ERR;
+//    result_t result = RESULT_ERR;
+//    hal_mcu_gpio_conf_t config;
 
-    /* INT */
-    hal_mcu_gpio_conf_t pin_int_conf =
-    {
-        /* Pin configuration */
-        .pin = p_conf->pin_int,
-        .direction = HAL_MCU_GPIO_DIR_OUTPUT,
-        .dir_conf.output.init_val = false,       /* The INT signal is initially reset. */
-    };
+    ASSERT_DYGMA( p_conf->pin_int_enable == false, "The SPI Link Slave INT pin is currently not supported" );
+    p_spils->pin_int_enabled = false;
 
-    result = hal_mcu_gpio_init( &p_spils->p_pin_int, &pin_int_conf );
-    EXIT_IF_ERR( result, "hal_mcu_gpio_init failed" );
+    return RESULT_OK;
 
-_EXIT:
-    return result;
+//    /**************/
+//    /* INT signal */
+//    /**************/
+//    if( p_conf->pin_int_enable == false )
+//    {
+//        p_spils->pin_int_enabled = false;
+//        p_spils->p_pin_int = NULL;
+//        return RESULT_OK;
+//    }
+//
+//    /* Pin configuration */
+//    config.pin = p_conf->pin_int;
+//    config.direction = HAL_MCU_GPIO_DIR_OUTPUT;
+//    config.dir_conf.output.init_val = false;       /* The INT signal is initially reset. */
+//
+//    result = hal_mcu_gpio_init( &p_spils->p_pin_int, &config );
+//    EXIT_IF_ERR( result, "hal_mcu_gpio_init failed" );
+//
+//    p_spils->pin_int_enabled = true;
+//
+//_EXIT:
+//    return result;
 }
 
 static result_t _buffers_init( spils_t * p_spils, const spils_conf_t * p_conf )
@@ -315,10 +330,15 @@ static result_t _int_signal_set( spils_t * p_spils )
 {
     result_t result = RESULT_ERR;
 
-    result = hal_mcu_gpio_out( p_spils->p_pin_int, true );
-    EXIT_IF_ERR( result, "hal_mcu_gpio_out failed" );
+    if( p_spils->pin_int_enabled == false )
+    {
+        return RESULT_OK;
+    }
 
-_EXIT:
+//    result = hal_mcu_gpio_out( p_spils->p_pin_int, true );
+//    EXIT_IF_ERR( result, "hal_mcu_gpio_out failed" );
+
+//_EXIT:
     return result;
 }
 
@@ -326,10 +346,15 @@ static result_t _int_signal_reset( spils_t * p_spils )
 {
     result_t result = RESULT_ERR;
 
-    result = hal_mcu_gpio_out( p_spils->p_pin_int, false );
-    EXIT_IF_ERR( result, "hal_mcu_gpio_out failed" );
+    if( p_spils->pin_int_enabled == false )
+    {
+        return RESULT_OK;
+    }
 
-_EXIT:
+//    result = hal_mcu_gpio_out( p_spils->p_pin_int, false );
+//    EXIT_IF_ERR( result, "hal_mcu_gpio_out failed" );
+
+//_EXIT:
     return result;
 }
 
