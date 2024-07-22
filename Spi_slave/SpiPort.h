@@ -109,7 +109,8 @@ class SpiPort
         Spi_slave *spi_slave = nullptr;
 
         void init(void);
-        void deInit(void);
+//        void deInit(void);
+        void run(void);
 
         bool readPacket(Packet &packet);
 
