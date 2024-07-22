@@ -71,6 +71,7 @@ struct spils
     bool_t data_in_available;
     bool_t data_out_available;
     bool_t line_in_busy;
+    bool_t line_in_is_saturated;
 
     /* Event handlers */
     void * p_instance;
@@ -216,6 +217,7 @@ static result_t _init( spils_t * p_spils, const spils_conf_t * p_conf )
     p_spils->data_in_available = false;
     p_spils->data_out_available = false;
     p_spils->line_in_busy = false;
+    p_spils->line_in_is_saturated = false;
 
     /* Event handlers */
     p_spils->p_instance = p_conf->p_instance;
@@ -555,11 +557,13 @@ static INLINE void _transfer_data_in_prepare( spils_t * p_spils, hal_mcu_spi_tra
     {
         p_transfer_conf->p_data_in = NULL;
         p_transfer_conf->data_in_len = 0;
+        p_spils->line_in_is_saturated = true;
     }
     else
     {
         p_transfer_conf->p_data_in = buffer_get_free_space_pointer( p_spils->p_buffer_in_cache );
         p_transfer_conf->data_in_len = buffer_get_free_space_line_size( p_spils->p_buffer_in_cache );
+        p_spils->line_in_is_saturated = false;
     }
 }
 
@@ -746,7 +750,7 @@ static INLINE void _transfer_data_in_process( spils_t * p_spils, hal_mcu_spi_tra
 {
     spil_mess_header_t * p_message_in_header;
 
-    if( p_spils->line_in_busy == true )
+    if( p_spils->line_in_busy == true || p_spils->line_in_is_saturated )
     {
         /* The input data line is still saturated. */
 
