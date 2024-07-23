@@ -28,6 +28,7 @@
 #include <Kaleidoscope-EEPROM-Settings.h>
 #include <Kaleidoscope-Ranges.h>
 
+
 namespace kaleidoscope
 {
 namespace plugin
@@ -35,7 +36,7 @@ namespace plugin
 
 #define BLE_CONNECTIONS_COUNT   5
 #define BLE_ADDRESS_LEN         6
-#define BLE_DEVICE_NAME_LEN     32
+#define BLE_DEVICE_NAME_LEN     32  // Same value as flag _BLE_DEVICE_NAME_LEN defined in the Ble_composite_dev.c file.
 
 class Ble_connections
 {
@@ -100,7 +101,7 @@ class Ble_flash_data
 
         currentChannel = 0;
         forceBle = false;
-        strcpy(keyb_ble_name, DEVICE_NAME);
+        strcpy(keyb_ble_name, BLE_DEVICE_NAME);
     }
 };
 
