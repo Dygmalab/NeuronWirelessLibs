@@ -119,6 +119,7 @@ class BleManager : public Plugin
     void init(void);
     bool getForceBle(void);
     void setForceBle(bool enabled);
+    void set_bt_name_from_specifications(const char *spec);
 
   private:
     enum Channels: uint8_t
@@ -156,6 +157,7 @@ class BleManager : public Plugin
     uint16_t flash_base_addr = 0;
     Ble_flash_data ble_flash_data;
 
+    const char *ble_device_name = nullptr;
     uint8_t channels = 0;
     uint8_t channel_in_use = NOT_CONNECTED;
     bool show_bt_layer = false;

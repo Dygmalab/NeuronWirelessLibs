@@ -176,7 +176,19 @@ EventHandlerResult BleManager::onSetup(void)
 void BleManager::update_channel_and_name(void)
 {
     set_current_channel(ble_flash_data.currentChannel);
-    set_device_name(ble_flash_data.keyb_ble_name);
+
+    if (ble_device_name != nullptr)
+    {
+        set_device_name(ble_device_name);
+
+        Runtime.storage().put(flash_base_addr, ble_flash_data);
+        Runtime.storage().commit();
+    }
+    else
+    {
+        set_device_name(ble_flash_data.keyb_ble_name);
+    }
+
     pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
 
     if (active_connection_peer_id == PM_PEER_ID_INVALID) // SI no tengo ningun dispositivo en el canal ejecuto el advertising con lista blanca para qu cualquier dispositivo lo encuentre
@@ -802,6 +814,11 @@ void BleManager::setForceBle(bool enabled)
     // Save it in flash memory.
     Runtime.storage().put(flash_base_addr, ble_flash_data);
     Runtime.storage().commit();
+}
+
+void BleManager::set_bt_name_from_specifications(const char *spec)
+{
+    ble_device_name = spec;
 }
 
 EventHandlerResult BleManager::onFocusEvent(const char *command)
