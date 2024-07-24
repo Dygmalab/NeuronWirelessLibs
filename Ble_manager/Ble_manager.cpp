@@ -899,7 +899,7 @@ EventHandlerResult BleManager::beforeReportingState(void)
 } //  namespace kaleidoscope
 
 
-kaleidoscope::plugin::BleManager BleManager;
+kaleidoscope::plugin::BleManager _BleManager;
 
 
 void device_name_evt_handler(void)
@@ -908,5 +908,5 @@ void device_name_evt_handler(void)
     NRF_LOG_INFO("Ble_manager: Event device name %s", get_connected_device_name_ptr());
 #endif
 
-    BleManager.trigger_save_name_timer = true;
+    _BleManager.trigger_save_name_timer = true;
 }

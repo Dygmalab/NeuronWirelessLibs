@@ -194,4 +194,4 @@ class BleManager : public Plugin
 } // namespace plugin
 } // namespace kaleidoscope
 
-extern kaleidoscope::plugin::BleManager BleManager;
+extern kaleidoscope::plugin::BleManager _BleManager;
