@@ -34,27 +34,10 @@
 
     The default options:
     nrf_spis_mode_t spi_mode = NRF_SPIS_MODE_0,
-    nrf_gpio_pin_drive_t pin_miso_strength = NRF_GPIO_PIN_S0S1,
-    nrf_gpio_pin_pull_t pin_csn_pullup = NRF_GPIO_PIN_NOPULL);
 
     Official documentation:
     https://infocenter.nordicsemi.com/topic/sdk_nrf5_v17.1.0/hardware_driver_spi_slave.html
     https://infocenter.nordicsemi.com/topic/sdk_nrf5_v17.1.0/group__nrfx__spis.html
-
-    Default configuration of the SPI slave instance:
-    {
-        .miso_pin = NRFX_SPIS_PIN_NOT_USED,
-        .mosi_pin = NRFX_SPIS_PIN_NOT_USED,
-        .sck_pin = NRFX_SPIS_PIN_NOT_USED,
-        .csn_pin = NRFX_SPIS_PIN_NOT_USED,
-        .mode = NRF_SPIS_MODE_0,
-        .bit_order = NRF_SPIS_BIT_ORDER_MSB_FIRST,
-        .csn_pullup = NRFX_SPIS_DEFAULT_CSN_PULLUP,   // NRFX_SPIS_DEFAULT_CSN_PULLUP is -> NRF_GPIO_PIN_NOPULL
-        .miso_drive = NRFX_SPIS_DEFAULT_MISO_DRIVE,   // NRFX_SPIS_DEFAULT_MISO_DRIVE is -> NRF_GPIO_PIN_S0S1
-        .def = NRFX_SPIS_DEFAULT_DEF,
-        .orc = NRFX_SPIS_DEFAULT_ORC,
-        .irq_priority = NRFX_SPIS_DEFAULT_CONFIG_IRQ_PRIORITY,
-    }
 
     NRF_SPIS_MODE_0: SCK active high, sample on leading edge of clock.  -> CPOL = 0 / CPHA = 0
     NRF_SPIS_MODE_1: SCK active high, sample on trailing edge of clock. -> CPOL = 0 / CPHA = 1
@@ -63,160 +46,76 @@
 */
 
 #include "Spi_slave.h"
+#include "spi_link_slave.h"
 #include "Ble_composite_dev.h"
 #include "CRC_wrapper.h"
 
-// SPIS user event handler.
-#if COMPILE_SPI0_SUPPORT
-static const nrf_drv_spis_t spi_slave_inst0 = NRF_DRV_SPIS_INSTANCE(0);
+#define SPILS_MESSAGE_SIZE_MAX      SPI_SLAVE_PACKET_SIZE
 
-static volatile uint8_t spi0_rx_buff[RX_BUFF_LEN];
-static Communications_protocol::Packet spi0_packet;
-static Fifo_buffer spi0tx_fifo(sizeof(spi1_packet));
-static Fifo_buffer spi0rx_fifo(sizeof(spi1_packet));
+typedef struct
+{
+    uint8_t spi_port;
+    hal_mcu_spi_periph_def_t periph_def;
+} spi_port_def_t;
 
+static const spi_port_def_t p_spi_port_def_array[] =
+{
+    { .spi_port = 0, .periph_def = HAL_MCU_SPI_PERIPH_DEF_SPI0 },
+    { .spi_port = 1, .periph_def = HAL_MCU_SPI_PERIPH_DEF_SPI1 },
+    { .spi_port = 2, .periph_def = HAL_MCU_SPI_PERIPH_DEF_SPI2 },
+    { .spi_port = 3, .periph_def = HAL_MCU_SPI_PERIPH_DEF_SPI3 },
+};
+#define get_spi_port_def( def, id ) _get_def( def, p_spi_port_def_array, spi_port_def_t, spi_port, id )
 
-void spi0_slave_event_handler(nrf_drv_spis_event_t event) {
-    if (event.evt_type == NRF_DRV_SPIS_XFER_DONE) {
-        memcpy(spi0_packet.buf, (const void *)spi0_rx_buff, sizeof(Communications_protocol::Packet));
-        spi0_rx_fifo.put(&spi0_packet);  // Put the new spi_packet in the Rx FIFO.
+typedef struct
+{
+    nrf_spis_mode_t nrf_spis_mode;
+    hal_mcu_spi_cpha_t cpha;            /* Clock phase */
+    hal_mcu_spi_cpol_t cpol;            /* Clock polarity */
+} spis_mode_def_t;
 
-        memset((void *)spi0_rx_buff, 0, RX_BUFF_LEN);                         // Clear Rx buffer.
-        memset(spi0_packet.buf, 0, sizeof(Communications_protocol::Packet));  // Clear Packet buffer.
+static const spis_mode_def_t p_spis_mode_def_array[] =
+{
+    { .nrf_spis_mode = NRF_SPIS_MODE_0, .cpha = HAL_MCU_SPI_CPHA_LEAD,  .cpol = HAL_MCU_SPI_CPOL_ACTIVE_HIGH },
+    { .nrf_spis_mode = NRF_SPIS_MODE_1, .cpha = HAL_MCU_SPI_CPHA_TRAIL, .cpol = HAL_MCU_SPI_CPOL_ACTIVE_HIGH },
+    { .nrf_spis_mode = NRF_SPIS_MODE_2, .cpha = HAL_MCU_SPI_CPHA_LEAD,  .cpol = HAL_MCU_SPI_CPOL_ACTIVE_LOW },
+    { .nrf_spis_mode = NRF_SPIS_MODE_3, .cpha = HAL_MCU_SPI_CPHA_TRAIL, .cpol = HAL_MCU_SPI_CPOL_ACTIVE_LOW},
+};
+#define get_spis_mode_def( def, id ) _get_def( def, p_spis_mode_def_array, spis_mode_def_t, nrf_spis_mode, id )
 
-        spi0_packet.header.device  = Communications_protocol::NEURON_DEFY_WIRELESS;
-        spi0_packet.header.command = Communications_protocol::IS_ALIVE;
+void Spi_slave::spils_event_handler( void * p_instance, spils_event_type_t event_type )
+{
+    Spi_slave * p_slave = ( Spi_slave *)p_instance;
 
-        if (!spi0_tx_fifo.is_empty())  // If there are packets to send in the Tx FIFO.
-        {
-            spi0_tx_fifo.get(&spi0_packet);  // Get a packet and send when the master polls.
-        }
+    switch( event_type )
+    {
+        case SPILS_EVENT_TYPE_DATA_IN_READY:
 
-        if (!spi0_tx_fifo.is_empty()) {
-            spi0_packet.header.has_more_packets = true;
-        } else {
-            spi0_packet.header.has_more_packets = false;
-        }
+            p_slave->spils_data_in_received = true;
 
+            break;
 
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&spi_slave_inst0, (const uint8_t *)&spi0_packet.buf, TX_BUFF_LEN, (uint8_t *)spi0_rx_buff, RX_BUFF_LEN));
+        case SPILS_EVENT_TYPE_DATA_OUT_SENT:
+
+            p_slave->spils_data_out_sending = false;
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled SPI Link Slave event" );
+
+            break;
     }
+
+
 }
-#endif
 
-#if COMPILE_SPI1_SUPPORT
-static const nrf_drv_spis_t spi_slave_inst1 = NRF_DRV_SPIS_INSTANCE(1);
+Spi_slave::Spi_slave(uint8_t _spi_port, uint32_t _miso_pin, uint32_t _mosi_pin, uint32_t _sck_pin, uint32_t _cs_pin, nrf_spis_mode_t _spi_mode)
+  : spi_port(_spi_port), miso_pin(_miso_pin), mosi_pin(_mosi_pin), sck_pin(_sck_pin), cs_pin(_cs_pin), spi_mode(_spi_mode) {
 
-static volatile uint8_t spi1_rx_buff[RX_BUFF_LEN];
-static Communications_protocol::Packet spi1_packet;
-static Fifo_buffer spi1_rx_fifo(sizeof(spi1_packet));
-static Fifo_buffer spi1_tx_fifo(sizeof(spi1_packet));
-
-void spi1_slave_event_handler(nrf_drv_spis_event_t event) {
-    if (event.evt_type == NRF_DRV_SPIS_XFER_DONE) {
-        memcpy(spi1_packet.buf, (const void *)spi1_rx_buff, sizeof(Communications_protocol::Packet));
-        uint8_t rx_crc         = spi1_packet.header.crc;
-        spi1_packet.header.crc = 0;
-        if (crc8(spi1_packet.buf, sizeof(Communications_protocol::Header) + spi1_packet.header.size) == rx_crc) {
-            spi1_rx_fifo.put(&spi1_packet);  // Put the new spi_packet in the Rx FIFO.
-        }
-
-        memset((void *)spi1_rx_buff, 0, RX_BUFF_LEN);                         // Clear Rx buffer.
-        memset(spi1_packet.buf, 0, sizeof(Communications_protocol::Packet));  // Clear Packet buffer.
-
-        spi1_packet.header.device  = Communications_protocol::NEURON_DEFY;
-        if (ble_innited()) {
-            spi1_packet.header.device = Communications_protocol::BLE_NEURON_2_DEFY;
-        }
-        spi1_packet.header.command = Communications_protocol::IS_ALIVE;
-
-        if (!spi1_tx_fifo.is_empty())  // If there are packets to send in the Tx FIFO.
-        {
-            spi1_tx_fifo.get(&spi1_packet);  // Get a packet and send when the master polls.
-        }
-
-        if (!spi1_tx_fifo.is_empty()) {
-            spi1_packet.header.has_more_packets = true;
-        } else {
-            spi1_packet.header.has_more_packets = false;
-        }
-        spi1_packet.header.crc = 0;
-        spi1_packet.header.crc = crc8(spi1_packet.buf, sizeof(Communications_protocol::Header) + spi1_packet.header.size);
-
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&spi_slave_inst1, (const uint8_t *)&spi1_packet.buf, TX_BUFF_LEN, (uint8_t *)spi1_rx_buff, RX_BUFF_LEN));
-    }
-}
-#endif
-
-#if COMPILE_SPI2_SUPPORT
-static const nrf_drv_spis_t spi_slave_inst2 = NRF_DRV_SPIS_INSTANCE(2);
-static volatile uint8_t spi2_rx_buff[RX_BUFF_LEN];
-static Communications_protocol::Packet spi2_packet;
-static Fifo_buffer spi2_tx_fifo(sizeof(spi1_packet));
-static Fifo_buffer spi2_rx_fifo(sizeof(spi1_packet));
-
-void spi2_slave_event_handler(nrf_drv_spis_event_t event) {
-    if (event.evt_type == NRF_DRV_SPIS_XFER_DONE) {
-        memcpy(spi2_packet.buf, (const void *)spi2_rx_buff, sizeof(Communications_protocol::Packet));
-        uint8_t rx_crc         = spi2_packet.header.crc;
-        spi2_packet.header.crc = 0;
-        if (crc8(spi2_packet.buf, sizeof(Communications_protocol::Header) + spi2_packet.header.size) == rx_crc) {
-            spi2_rx_fifo.put(&spi2_packet);  // Put the new spi_packet in the Rx FIFO.
-        }
-
-        memset((void *)spi2_rx_buff, 0, RX_BUFF_LEN);                         // Clear Rx buffer.
-        memset(spi2_packet.buf, 0, sizeof(Communications_protocol::Packet));  // Clear Packet buffer.
-
-        spi2_packet.header.device = Communications_protocol::NEURON_DEFY;
-        if (ble_innited()) {
-            spi2_packet.header.device = Communications_protocol::BLE_NEURON_2_DEFY;
-        }
-        spi2_packet.header.command = Communications_protocol::IS_ALIVE;
-
-        if (!spi2_tx_fifo.is_empty())  // If there are packets to send in the Tx FIFO.
-        {
-            spi2_tx_fifo.get(&spi2_packet);  // Get a packet and send when the master polls.
-        }
-
-        if (!spi2_tx_fifo.is_empty()) {
-            spi2_packet.header.has_more_packets = true;
-        } else {
-            spi2_packet.header.has_more_packets = false;
-        }
-        spi2_packet.header.crc = 0;
-        spi2_packet.header.crc = crc8(spi2_packet.buf, sizeof(Communications_protocol::Header) + spi2_packet.header.size);
-
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(&spi_slave_inst2, (const uint8_t *)&spi2_packet.buf, TX_BUFF_LEN, (uint8_t *)spi2_rx_buff, RX_BUFF_LEN));
-    }
-}
-#endif
-
-
-Spi_slave::Spi_slave(uint8_t _spi_port, uint32_t _miso_pin, uint32_t _mosi_pin, uint32_t _sck_pin, uint32_t _cs_pin, nrf_spis_mode_t _spi_mode, nrf_gpio_pin_drive_t _pin_miso_strength, nrf_gpio_pin_pull_t _pin_csn_pullup)
-  : spi_port(_spi_port), miso_pin(_miso_pin), mosi_pin(_mosi_pin), sck_pin(_sck_pin), cs_pin(_cs_pin), spi_mode(_spi_mode), pin_miso_strength(_pin_miso_strength), pin_csn_pullup(_pin_csn_pullup) {
-#if COMPILE_SPI0_SUPPORT
-    if (spi_port == 0) {
-        spi_slave_inst = &spi_slave_inst0;
-        rx_fifo        = &spi0_rx_fifo;
-        tx_fifo        = &spi0_tx_fifo;
-    }
-#endif
-
-#if COMPILE_SPI1_SUPPORT
-    if (spi_port == 1) {
-        spi_slave_inst = &spi_slave_inst1;
-        rx_fifo        = &spi1_rx_fifo;
-        tx_fifo        = &spi1_tx_fifo;
-    }
-#endif
-
-#if COMPILE_SPI2_SUPPORT
-    if (spi_port == 2) {
-        spi_slave_inst = &spi_slave_inst2;
-        rx_fifo        = &spi2_rx_fifo;
-        tx_fifo        = &spi2_tx_fifo;
-    }
-#endif
+    rx_fifo = &spi_rx_fifo;
+    tx_fifo = &spi_tx_fifo;
 
 #if SPI_SLAVE_DEBUG
     if (spi_port > 2) {
@@ -226,145 +125,138 @@ Spi_slave::Spi_slave(uint8_t _spi_port, uint32_t _miso_pin, uint32_t _mosi_pin, 
 #endif
 };
 
-void Spi_slave::init(void) {
-    /*
-        Enable the constant latency sub power mode to minimize the time it takes
-        for the SPIS peripheral to become active after the CSN line is asserted
-        (when the CPU is in sleep mode).
-    */
-    //NRF_POWER->TASKS_CONSTLAT = 1;  // Error de softdevice al activar.
+void Spi_slave::init(void)
+{
+    result_t result = RESULT_ERR;
 
-    nrf_drv_spis_config_t spi_slave_config = NRF_DRV_SPIS_DEFAULT_CONFIG;
-    /*
-        Default configuration of the SPI slave instance:
-        {
-            .miso_pin = NRFX_SPIS_PIN_NOT_USED,
-            .mosi_pin = NRFX_SPIS_PIN_NOT_USED,
-            .sck_pin = NRFX_SPIS_PIN_NOT_USED,
-            .csn_pin = NRFX_SPIS_PIN_NOT_USED,
-            .mode = NRF_SPIS_MODE_0,
-            .bit_order = NRF_SPIS_BIT_ORDER_MSB_FIRST,
-            .csn_pullup = NRFX_SPIS_DEFAULT_CSN_PULLUP,   // NRFX_SPIS_DEFAULT_CSN_PULLUP is -> NRF_GPIO_PIN_NOPULL
-            .miso_drive = NRFX_SPIS_DEFAULT_MISO_DRIVE,   // NRFX_SPIS_DEFAULT_MISO_DRIVE is -> NRF_GPIO_PIN_S0S1
-            .def = NRFX_SPIS_DEFAULT_DEF,
-            .orc = NRFX_SPIS_DEFAULT_ORC,
-            .irq_priority = NRFX_SPIS_DEFAULT_CONFIG_IRQ_PRIORITY,
-        }
+    spils_conf_t config;
+    const spi_port_def_t * p_spi_port_def;
+    const spis_mode_def_t * p_spis_mode_def;
 
+    /* Get the SPI port definition */
+    get_spi_port_def( p_spi_port_def, spi_port );
+    ASSERT_DYGMA( p_spi_port_def != NULL, "Invalid SPI port selection" );
 
-        NRF_SPIS_MODE_0: SCK active high, sample on leading edge of clock.  -> CPOL = 0 / CPHA = 0
-        NRF_SPIS_MODE_1: SCK active high, sample on trailing edge of clock. -> CPOL = 0 / CPHA = 1
-        NRF_SPIS_MODE_2: SCK active low, sample on leading edge of clock.   -> CPOL = 1 / CPHA = 0
-        NRF_SPIS_MODE_3: SCK active low, sample on trailing edge of clock.  -> CPOL = 1 / CPHA = 1
-    */
-    spi_slave_config.miso_pin   = miso_pin;
-    spi_slave_config.mosi_pin   = mosi_pin;
-    spi_slave_config.sck_pin    = sck_pin;
-    spi_slave_config.csn_pin    = cs_pin;
-    spi_slave_config.mode       = spi_mode;
-    spi_slave_config.miso_drive = pin_miso_strength;
-    spi_slave_config.csn_pullup = pin_csn_pullup;
+    /* Get the SPIS mode definition */
+    get_spis_mode_def( p_spis_mode_def, spi_mode );
+    ASSERT_DYGMA( p_spis_mode_def != NULL, "Invalid SPIS mode selection" );
 
-    Communications_protocol::Packet packet{};
+    /* SPI HAL */
+    config.spi.def = p_spi_port_def->periph_def;
 
-#if COMPILE_SPI0_SUPPORT
-    if (spi_port == 0) {
-        APP_ERROR_CHECK(nrf_drv_spis_init(spi_slave_inst, &spi_slave_config, spi0_slave_event_handler));
+    config.spi.pin_miso = (hal_mcu_gpio_pin_t)miso_pin;
+    config.spi.pin_mosi = (hal_mcu_gpio_pin_t)mosi_pin;
+    config.spi.pin_sck  = (hal_mcu_gpio_pin_t)sck_pin;
+    config.spi.pin_cs   = (hal_mcu_gpio_pin_t)cs_pin;
 
-        // Start listening to the SPI master.
-        memset((void *)spi0_rx_buff, 0, RX_BUFF_LEN);  // Clear Rx buffer.
+    config.spi.line.freq = HAL_MCU_SPI_FREQ_4M;
+    config.spi.line.cpha = p_spis_mode_def->cpha;       /* Clock phase */
+    config.spi.line.cpol = p_spis_mode_def->cpol;       /* Clock polarity */
+    config.spi.line.bit_order = HAL_MCU_SPI_BIT_ORDER_MSB_FIRST;
 
-        /*
-            Function for preparing the SPI slave instance for a single SPI transaction.
-            To receive data, the SPI buffers must be set by calling nrf_drv_spis_buffers_set.
+    /* GPIO */
+    config.pin_int_enable = false;
+    //config.pin_int = ;
 
-            New buffers must be set by calling nrf_drv_spis_buffers_set after every finished
-            transaction. Otherwise, the transaction is ignored, and the default character is
-            clocked out.
+    /* Cache */
+    config.message_size_max = SPILS_MESSAGE_SIZE_MAX;
 
-            Note:
-            This function can be called from the callback function context.
+    /* Event handlers */
+    config.p_instance = this;
+    config.event_handler = spils_event_handler;
 
-            Client applications must call this function after every NRFX_SPIS_XFER_DONE event
-            if the SPI slave driver must be prepared for a possible new SPI transaction.
+    result = spils_init( &p_spils, &config );
+    ASSERT_DYGMA( result == RESULT_OK, "spils_init failed" );
+    EXIT_IF_ERR( result, "spils_init failed" );
 
-            Peripherals using EasyDMA (including SPIS) require the transfer buffers
-            to be placed in the Data RAM region. If this condition is not met, this
-            function will fail with the error code NRFX_ERROR_INVALID_ADDR.
-        */
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(spi_slave_inst, (const uint8_t *)&packet.buf, sizeof(&packet), (uint8_t *)spi0_rx_buff, RX_BUFF_LEN));
-    }
-#endif
-
-#if COMPILE_SPI1_SUPPORT
-    if (spi_port == 1) {
-        APP_ERROR_CHECK(nrf_drv_spis_init(spi_slave_inst, &spi_slave_config, spi1_slave_event_handler));
-
-        // Start listening to the SPI master.
-        memset((void *)spi1_rx_buff, 0, RX_BUFF_LEN);  // Clear Rx buffer.
-
-        /*
-            Function for preparing the SPI slave instance for a single SPI transaction.
-            To receive data, the SPI buffers must be set by calling nrf_drv_spis_buffers_set.
-
-            New buffers must be set by calling nrf_drv_spis_buffers_set after every finished
-            transaction. Otherwise, the transaction is ignored, and the default character is
-            clocked out.
-
-            Note:
-            This function can be called from the callback function context.
-
-            Client applications must call this function after every NRFX_SPIS_XFER_DONE event
-            if the SPI slave driver must be prepared for a possible new SPI transaction.
-
-            Peripherals using EasyDMA (including SPIS) require the transfer buffers
-            to be placed in the Data RAM region. If this condition is not met, this
-            function will fail with the error code NRFX_ERROR_INVALID_ADDR.
-        */
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(spi_slave_inst, (const uint8_t *)&packet.buf, TX_BUFF_LEN, (uint8_t *)spi1_rx_buff, RX_BUFF_LEN));
-    }
-#endif
-
-#if COMPILE_SPI2_SUPPORT
-    if (spi_port == 2) {
-        APP_ERROR_CHECK(nrf_drv_spis_init(spi_slave_inst, &spi_slave_config, spi2_slave_event_handler));
-
-        // Start listening to the SPI master.
-        memset((void *)spi2_rx_buff, 0, RX_BUFF_LEN);  // Clear Rx buffer.
-
-        /*
-            Function for preparing the SPI slave instance for a single SPI transaction.
-            To receive data, the SPI buffers must be set by calling nrf_drv_spis_buffers_set.
-
-            New buffers must be set by calling nrf_drv_spis_buffers_set after every finished
-            transaction. Otherwise, the transaction is ignored, and the default character is
-            clocked out.
-
-            Note:
-            This function can be called from the callback function context.
-
-            Client applications must call this function after every NRFX_SPIS_XFER_DONE event
-            if the SPI slave driver must be prepared for a possible new SPI transaction.
-
-            Peripherals using EasyDMA (including SPIS) require the transfer buffers
-            to be placed in the Data RAM region. If this condition is not met, this
-            function will fail with the error code NRFX_ERROR_INVALID_ADDR.
-        */
-        APP_ERROR_CHECK(nrf_drv_spis_buffers_set(spi_slave_inst, (const uint8_t *)&packet.buf, TX_BUFF_LEN, (uint8_t *)spi2_rx_buff, RX_BUFF_LEN));
-    }
-#endif
+_EXIT:
+    return;
 }
 
-void Spi_slave::deinit(void) {
-    /*
-        Function for uninitializing the SPI slave driver instance.
-        When the SPI slave driver instance is no longer needed or its
-        configuration must be changed, call nrf_drv_spis_uninit.
+void Spi_slave::run(void)
+{
+    data_in_process( );
+    data_out_process( );
+}
 
-    When the peripheral is disabled, the pins will behave as
-                                         regular GPIOs and use the configuration in their respective
-                                             OUT bit field and PIN_CNF[n] register.
-                                                 */
+void Spi_slave::data_in_process(void)
+{
+    result_t result = RESULT_ERR;
+    Communications_protocol::Packet spi_packet;
+    uint16_t data_in_len;
+    uint8_t spi_packet_crc;
 
-    nrf_drv_spis_uninit(spi_slave_inst);
+    if( spils_data_in_received == false )
+    {
+        return;
+    }
+
+    data_in_len = sizeof( spi_packet.buf );
+    result = spils_data_read(p_spils, spi_packet.buf, &data_in_len );
+    ASSERT_DYGMA( data_in_len == sizeof( spi_packet.buf ), "Invalide size of the SPI slave packet received" );
+    EXIT_IF_NOK(result);
+
+    spils_data_in_received = spils_data_read_available( p_spils );
+
+    /* Parse the packet */
+    spi_packet_crc = spi_packet.header.crc;
+    spi_packet.header.crc = 0;
+    if (crc8(spi_packet.buf, sizeof(Communications_protocol::Header) + spi_packet.header.size) == spi_packet_crc) {
+        spi_rx_fifo.put(&spi_packet);  // Put the new spi_packet in the Rx FIFO.
+    }
+
+    /* Check if there are packets in the output fifo */
+    if ( spi_tx_fifo.is_empty() == false )
+    {
+        /* Finish here, the output packets will be sent in the data_out_process */
+        return;
+    }
+
+    memset( &spi_packet, 0x00, sizeof( spi_packet ) );
+
+    /* Prepare the IS_ALIVE packet */
+    spi_packet.header.device = (ble_innited()) ? Communications_protocol::BLE_NEURON_2_DEFY : Communications_protocol::NEURON_DEFY;
+    spi_packet.header.command = Communications_protocol::IS_ALIVE;
+
+    spi_tx_fifo.put( &spi_packet );
+
+_EXIT:
+    return;
+}
+
+void Spi_slave::data_out_process(void)
+{
+    result_t result = RESULT_ERR;
+    Communications_protocol::Packet spi_packet;
+    size_t data_out_len;
+
+    /* Check if the send process is still running or the TX fifo is empty */
+    if( spils_data_out_sending == true || spi_tx_fifo.is_empty() == true )
+    {
+        return;
+    }
+
+    /* Get packet from the Tx fifo */
+    data_out_len = spi_tx_fifo.get(&spi_packet);
+    ASSERT_DYGMA( data_out_len == sizeof( spi_packet ), "Failure: Empty Packet received from FIFO" );
+
+    spi_packet.header.has_more_packets = ( spi_tx_fifo.is_empty() == true ) ? false : true;
+    spi_packet.header.crc = 0;
+    spi_packet.header.crc = crc8(spi_packet.buf, sizeof(Communications_protocol::Header) + spi_packet.header.size);
+
+    /* This is for the possible hazard handling. The receive end callback might theoretically come before the end of the function */
+    spils_data_out_sending = true;
+    result = spils_data_send( p_spils, spi_packet.buf, sizeof( spi_packet.buf ) );
+    ASSERT_DYGMA( result == RESULT_OK, "Failure: spils_data_send failed" );
+    EXIT_IF_NOK( result );
+
+_EXIT:
+    if( result != RESULT_OK )
+    {
+        spils_data_out_sending = false;
+    }
+
+    return;
+
+    UNUSED( data_out_len );
 }

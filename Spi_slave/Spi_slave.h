@@ -83,6 +83,7 @@ extern "C" {
 #include <queue>
 #include <Communications_protocol.h>
 #include "Fifo_buffer.h"
+#include "spi_link_slave.h"
 
 #define SPI_SLAVE_DEBUG                 0
 #define SPI_DEBUG_PRINT_RX_PACKET       0
@@ -92,9 +93,7 @@ extern "C" {
 #define COMPILE_SPI1_SUPPORT            1
 #define COMPILE_SPI2_SUPPORT            1
 
-
-#define RX_BUFF_LEN                     sizeof(Communications_protocol::Packet)
-#define TX_BUFF_LEN                     sizeof(Communications_protocol::Packet)
+#define SPI_SLAVE_PACKET_SIZE           sizeof(Communications_protocol::Packet)
 
 class Spi_slave {
    public:
@@ -103,12 +102,11 @@ class Spi_slave {
               uint32_t _mosi_pin,
               uint32_t _sck_pin,
               uint32_t _cs_pin,
-              nrf_spis_mode_t _spi_mode = NRF_SPIS_MODE_0,
-              nrf_gpio_pin_drive_t _pin_miso_strength = NRF_GPIO_PIN_S0S1,
-              nrf_gpio_pin_pull_t _pin_csn_pullup = NRF_GPIO_PIN_NOPULL);
+              nrf_spis_mode_t _spi_mode = NRF_SPIS_MODE_0 );
 
     void init(void);
-    void deinit(void);
+    //void deinit(void);
+    void run(void);
 
     Fifo_buffer *rx_fifo;
     Fifo_buffer *tx_fifo;
@@ -122,10 +120,20 @@ class Spi_slave {
     uint32_t cs_pin;
 
     nrf_spis_mode_t spi_mode;                // NRF_SPIS_MODE_0, NRF_SPIS_MODE_1, ..
-    nrf_gpio_pin_drive_t pin_miso_strength;  // NRF_GPIO_PIN_H0S1, NRF_GPIO_PIN_S0H1, ..
-    nrf_gpio_pin_pull_t pin_csn_pullup;      //�NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_PULLDOWN, NRF_GPIO_PIN_PULLUP.
 
-    const nrf_drv_spis_t *spi_slave_inst;
+    spils_t * p_spils;
+
+    bool_t spils_data_in_received = false;
+    bool_t spils_data_out_sending = false;
+
+    /* Buffers */
+    Fifo_buffer spi_rx_fifo = Fifo_buffer(SPI_SLAVE_PACKET_SIZE);
+    Fifo_buffer spi_tx_fifo = Fifo_buffer(SPI_SLAVE_PACKET_SIZE);
+
+    static void spils_event_handler( void * p_instance, spils_event_type_t event_type );
+
+    void data_in_process(void);
+    void data_out_process(void);
 };
 
 

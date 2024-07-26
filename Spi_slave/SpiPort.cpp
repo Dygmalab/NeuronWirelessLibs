@@ -82,10 +82,16 @@ void SpiPort::init() {
     spi_slave->init();  // Initialice SPI slave.
 }
 
-void SpiPort::deInit() {
+//void SpiPort::deInit() {
+//    if (spi_slave == nullptr) return;
+//
+//    spi_slave->deinit();
+//}
+
+void SpiPort::run() {
     if (spi_slave == nullptr) return;
 
-    spi_slave->deinit();
+    spi_slave->run();
 }
 
 bool SpiPort::sendPacket(Packet &packet) {
@@ -123,3 +129,4 @@ bool SpiPort::readPacket(Packet &packet) {
 
     return true;
 }
+
