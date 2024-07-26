@@ -28,6 +28,7 @@
 #include <Kaleidoscope-EEPROM-Settings.h>
 #include <Kaleidoscope-Ranges.h>
 
+
 namespace kaleidoscope
 {
 namespace plugin
@@ -35,7 +36,7 @@ namespace plugin
 
 #define BLE_CONNECTIONS_COUNT   5
 #define BLE_ADDRESS_LEN         6
-#define BLE_DEVICE_NAME_LEN     32
+#define BLE_DEVICE_NAME_LEN     32  // Same value as flag _BLE_DEVICE_NAME_LEN defined in the Ble_composite_dev.c file.
 
 class Ble_connections
 {
@@ -87,7 +88,7 @@ class Ble_flash_data
 {
   public:
     Ble_connections ble_connections[BLE_CONNECTIONS_COUNT];
-    char defy_ble_name[BLE_DEVICE_NAME_LEN];
+    char keyb_ble_name[BLE_DEVICE_NAME_LEN];
     uint8_t currentChannel;
     bool forceBle;
 
@@ -100,7 +101,7 @@ class Ble_flash_data
 
         currentChannel = 0;
         forceBle = false;
-        strcpy(defy_ble_name, DEVICE_NAME);
+        strcpy(keyb_ble_name, BLE_DEVICE_NAME);
     }
 };
 
@@ -118,6 +119,7 @@ class BleManager : public Plugin
     void init(void);
     bool getForceBle(void);
     void setForceBle(bool enabled);
+    void set_bt_name_from_specifications(const char *spec);
 
   private:
     enum Channels: uint8_t
@@ -155,6 +157,7 @@ class BleManager : public Plugin
     uint16_t flash_base_addr = 0;
     Ble_flash_data ble_flash_data;
 
+    const char *ble_device_name = nullptr;
     uint8_t channels = 0;
     uint8_t channel_in_use = NOT_CONNECTED;
     bool show_bt_layer = false;
@@ -191,4 +194,4 @@ class BleManager : public Plugin
 } // namespace plugin
 } // namespace kaleidoscope
 
-extern kaleidoscope::plugin::BleManager BleManager;
+extern kaleidoscope::plugin::BleManager _BleManager;

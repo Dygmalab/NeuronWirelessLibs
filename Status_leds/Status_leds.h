@@ -27,6 +27,7 @@
 #ifndef __STATUS_LEDS__
 #define __STATUS_LEDS__
 
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -41,39 +42,61 @@ extern "C"
 }
 #endif
 
-#define STATUS_LEDS_FADE_RESOLUTION 100
-#define STATUS_LEDS_PWM_MAX_COUNT 2500
+
+#define STATUS_LEDS_FADE_RESOLUTION     100
+#define STATUS_LEDS_PWM_MAX_COUNT       2500
+
 
 class Status_leds
 {
-public:
-    Status_leds(uint16_t green_led_pin, uint16_t red_led_pin);
+    public:
+        Status_leds(uint16_t green_led_pin, uint16_t red_led_pin);
 
-    void init();
+        void init(void);
 
-    void green_fade(uint8_t min_brightness, uint8_t max_brightness);
-    void static_green(uint8_t brightness);
-    void stop_all();
-    void red_fade(uint8_t min_brightness, uint8_t max_brightness);
-    void yellow_fade(uint8_t min_brightness, uint8_t max_brightness);
-    void all_colors_fade(uint8_t min_brightness, uint8_t max_brightness);
+        void static_green(uint8_t brightness);
+        void static_yellow(uint8_t brightness);
+        void static_red(uint8_t brightness);
 
-private:
-    uint8_t _green_led_pin;
-    uint8_t _red_led_pin;
+        void green_fade(uint8_t min_brightness, uint8_t max_brightness);
+        void yellow_fade(uint8_t min_brightness, uint8_t max_brightness);
+        void red_fade(uint8_t min_brightness, uint8_t max_brightness);
+        void all_colors_fade(uint8_t min_brightness, uint8_t max_brightness);
 
-    nrfx_pwm_t pwm_instance;
-    nrfx_pwm_config_t pwm_config;
+        void stop_all(void);
 
-    nrf_pwm_values_individual_t pwm_values[STATUS_LEDS_FADE_RESOLUTION];
-    nrf_pwm_values_individual_t pwm_values_static[1];
-    nrf_pwm_sequence_t pwm_sequence;
+    private:
+        typedef enum
+        {
+            STATIC_GREEN_FLAG,
+            STATIC_YELLOW_FLAG,
+            STATIC_RED_FLAG,
+            FADE_GREEN_FLAG,
+            FADE_YELLOW_FLAG,
+            FADE_RED_FLAG,
+            RED_GREEN_ALTERNATE_FLAG,
+        } flag_type_t;
 
-    bool flag_green_fade_running = false;
-    bool flag_green_static_running = false;
-    bool flag_red_fade_running = false;
-    bool flag_yellow_fade_running = false;
-    bool flag_red_green_fade_alternate_running = false;
+        uint16_t _green_led_pin;
+        uint16_t _red_led_pin;
+
+        nrfx_pwm_t pwm_instance;
+        nrfx_pwm_config_t pwm_config;
+
+        nrf_pwm_values_individual_t pwm_values[STATUS_LEDS_FADE_RESOLUTION];
+        nrf_pwm_values_individual_t pwm_values_static[1];
+        nrf_pwm_sequence_t pwm_sequence;
+
+        bool flag_green_static_running = false;
+        bool flag_yellow_static_running = false;
+        bool flag_red_static_running = false;
+        bool flag_green_fade_running = false;
+        bool flag_yellow_fade_running = false;
+        bool flag_red_fade_running = false;
+        bool flag_red_green_fade_alternate_running = false;
+
+        void set_flag(flag_type_t flag);
 };
 
-#endif // __STATUS_LEDS__
+
+#endif  // __STATUS_LEDS__

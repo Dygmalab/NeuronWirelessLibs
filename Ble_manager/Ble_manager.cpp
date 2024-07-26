@@ -176,7 +176,19 @@ EventHandlerResult BleManager::onSetup(void)
 void BleManager::update_channel_and_name(void)
 {
     set_current_channel(ble_flash_data.currentChannel);
-    set_device_name(ble_flash_data.defy_ble_name);
+
+    if (ble_device_name != nullptr)
+    {
+        set_device_name(ble_device_name);
+
+        Runtime.storage().put(flash_base_addr, ble_flash_data);
+        Runtime.storage().commit();
+    }
+    else
+    {
+        set_device_name(ble_flash_data.keyb_ble_name);
+    }
+
     pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
 
     if (active_connection_peer_id == PM_PEER_ID_INVALID) // SI no tengo ningun dispositivo en el canal ejecuto el advertising con lista blanca para qu cualquier dispositivo lo encuentre
@@ -804,6 +816,11 @@ void BleManager::setForceBle(bool enabled)
     Runtime.storage().commit();
 }
 
+void BleManager::set_bt_name_from_specifications(const char *spec)
+{
+    ble_device_name = spec;
+}
+
 EventHandlerResult BleManager::onFocusEvent(const char *command)
 {
     //    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
@@ -840,7 +857,7 @@ EventHandlerResult BleManager::onFocusEvent(const char *command)
     //            NRF_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
     //#endif
     //
-    //            for (const auto &device_name_letter : ble_flash_data.defy_ble_name)
+    //            for (const auto &device_name_letter : ble_flash_data.keyb_ble_name)
     //            {
     //                ::Focus.send((uint8_t)device_name_letter);
     //            }
@@ -851,7 +868,7 @@ EventHandlerResult BleManager::onFocusEvent(const char *command)
     //            NRF_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
     //#endif
     //
-    //            for (auto &device_name_letter : ble_flash_data.defy_ble_name)
+    //            for (auto &device_name_letter : ble_flash_data.keyb_ble_name)
     //            {
     //                uint8_t aux;
     //                ::Focus.read(aux);
@@ -882,7 +899,7 @@ EventHandlerResult BleManager::beforeReportingState(void)
 } //  namespace kaleidoscope
 
 
-kaleidoscope::plugin::BleManager BleManager;
+kaleidoscope::plugin::BleManager _BleManager;
 
 
 void device_name_evt_handler(void)
@@ -891,5 +908,5 @@ void device_name_evt_handler(void)
     NRF_LOG_INFO("Ble_manager: Event device name %s", get_connected_device_name_ptr());
 #endif
 
-    BleManager.trigger_save_name_timer = true;
+    _BleManager.trigger_save_name_timer = true;
 }

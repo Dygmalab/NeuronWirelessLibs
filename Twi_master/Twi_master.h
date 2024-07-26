@@ -51,8 +51,8 @@ extern "C"
 #endif
 
 
-#define TWI_MASTER_DEBUG                 0
-#define TWI_MASTER_PRINT_RECEIVED_BUFFER 0
+#define TWI_MASTER_DEBUG                    0
+#define TWI_MASTER_PRINT_RECEIVED_BUFFER    0
 
 
 #define TWI_PORT    0

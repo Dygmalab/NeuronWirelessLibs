@@ -165,7 +165,6 @@ bool inline filterHand(Communications_protocol::Devices incomingDevice, bool rig
 
 EventHandlerResult Battery::onSetup()
 {
-
     // Save saving_mode variable in EEPROM
     settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(saving_mode));
     uint8_t saving;
@@ -178,70 +177,68 @@ EventHandlerResult Battery::onSetup()
     }
     Runtime.storage().get(settings_saving_, saving_mode); // safe get
 
+    Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
+        if (filterHand(packet.header.device, false))
+        {
+            status_left = packet.data[0];
+        }
 
-    Communications.callbacks.bind(BATTERY_STATUS, (
-                                                      [this](Packet const &packet)
-                                                      {
-                                                          if (filterHand(packet.header.device, false))
-                                                          {
-                                                              status_left = packet.data[0];
-                                                          }
-                                                          if (filterHand(packet.header.device, true))
-                                                          {
-                                                              status_right = packet.data[0];
-                                                          }
+        if (filterHand(packet.header.device, true))
+        {
+            status_right = packet.data[0];
+        }
 
-#if DEBUG_LOG_BATTERY_MANAGER
-                                                          NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
-#endif
-                                                      }));
+        #if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
+        #endif
+    }));
 
-    Communications.callbacks.bind(BATTERY_LEVEL, (
-                                                     [this](Packet const &packet)
-                                                     {
-                                                         if (filterHand(packet.header.device, false))
-                                                         {
-                                                             battery_level_left = packet.data[0];
-                                                         }
-                                                         if (filterHand(packet.header.device, true))
-                                                         {
-                                                             battery_level_right = packet.data[0];
-                                                         }
-                                                         uint16_t battery_level_mv;
-                                                         memcpy(&battery_level_mv, &packet.data[1], sizeof(battery_level_mv));
-                                                         ble_battery_level_update(min(battery_level_left, battery_level_right));
-#if DEBUG_LOG_BATTERY_MANAGER
-                                                         NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
-                                                                       packet.header.device,
-                                                                       packet.data[0],
-                                                                       battery_level_mv);
-#endif
-                                                     }));
+    Communications.callbacks.bind(BATTERY_LEVEL, ([this](Packet const &packet) {
+        if (filterHand(packet.header.device, false))
+        {
+            battery_level_left = packet.data[0];
+        }
 
-    Communications.callbacks.bind(DISCONNECTED, (
-                                                    [this](Packet const &packet)
-                                                    {
-                                                        if (filterHand(packet.header.device, false))
-                                                        {
-                                                            battery_level_left = 100;
-                                                            status_left = 4;
-                                                        }
-                                                        if (filterHand(packet.header.device, true))
-                                                        {
-                                                            battery_level_right = 100;
-                                                            status_right = 4;
-                                                        }
-                                                        ble_battery_level_update(min(battery_level_left, battery_level_right));
-                                                    }));
+        if (filterHand(packet.header.device, true))
+        {
+            battery_level_right = packet.data[0];
+        }
 
-    Communications.callbacks.bind(CONNECTED, (
-                                                 [this](Packet packet)
-                                                 {
-                                                     packet.header.command = BATTERY_SAVING;
-                                                     packet.header.size = 1;
-                                                     packet.data[0] = saving_mode;
-                                                     Communications.sendPacket(packet);
-                                                 }));
+        uint16_t battery_level_mv;
+        memcpy(&battery_level_mv, &packet.data[1], sizeof(battery_level_mv));
+        ble_battery_level_update(min(battery_level_left, battery_level_right));
+
+        #if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
+        packet.header.device,
+        packet.data[0],
+        battery_level_mv);
+        #endif
+    }));
+
+    Communications.callbacks.bind(DISCONNECTED, ([this](Packet const &packet) {
+        if (filterHand(packet.header.device, false))
+        {
+            battery_level_left = 100;
+            status_left = 4;
+        }
+
+        if (filterHand(packet.header.device, true))
+        {
+            battery_level_right = 100;
+            status_right = 4;
+        }
+
+        ble_battery_level_update(min(battery_level_left, battery_level_right));
+    }));
+
+    Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {
+        packet.header.command = BATTERY_SAVING;
+        packet.header.size = 1;
+        packet.data[0] = saving_mode;
+        Communications.sendPacket(packet);
+    }));
+
     return EventHandlerResult::OK;
 }
 
