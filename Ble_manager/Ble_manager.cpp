@@ -476,7 +476,7 @@ EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr
 
         count++;
 
-        if (count == 6) // PIN numbers has 6 digits.
+        if (count == 6) // BLE PIN numbers has 6 digits.
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Sending pin number..");
