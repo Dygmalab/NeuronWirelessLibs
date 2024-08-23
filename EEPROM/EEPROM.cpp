@@ -116,14 +116,16 @@ extern "C"
 #define FLASH_STORAGE_NUM_PAGES                 2
 #define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
 
-#define FLASH_STORAGE_FIRST_PAGE_START_ADDR     BOOTLOADER_ADDRESS - FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE
-#define FLASH_STORAGE_LAST_PAGE_END_ADDR        FLASH_STORAGE_FIRST_PAGE_START_ADDR + (FLASH_STORAGE_PAGE_SIZE * FLASH_STORAGE_NUM_PAGES) - 1
+#define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
+#define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
 
 
 volatile static bool flag_write_completed = false;
 volatile static bool flag_erase_completed = false;
 
 static void fstorage_evt_handler(nrf_fstorage_evt_t *evt);
+static inline uint32_t flash_first_page_start_addr_get(void);
+static inline uint32_t flash_last_page_end_addr_get(void);
 
 // Creates an fstorage instance.
 NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
@@ -137,6 +139,33 @@ NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
     .start_addr = FLASH_STORAGE_FIRST_PAGE_START_ADDR,
     .end_addr = FLASH_STORAGE_LAST_PAGE_END_ADDR,
 };
+
+/*
+ * The bulk of this function has been taken from Nordic's SDK fds.c module
+ */
+static inline uint32_t flash_first_page_start_addr_get( void )
+{
+    uint32_t const bootloader_addr = BOOTLOADER_ADDRESS;
+    uint32_t const page_sz         = NRF_FICR->CODEPAGESIZE;
+
+#if defined(NRF52810_XXAA) || defined(NRF52811_XXAA)
+    // Hardcode the number of flash pages, necessary for SoC emulation.
+    // nRF52810 on nRF52832 and
+    // nRF52811 on nRF52840
+    uint32_t const code_sz = 48;
+#else
+   uint32_t const code_sz = NRF_FICR->CODESIZE;
+#endif
+
+    uint32_t end_addr = (bootloader_addr != 0xFFFFFFFF) ? bootloader_addr : (code_sz * page_sz);
+
+    return end_addr - ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE );
+}
+
+static inline uint32_t flash_last_page_end_addr_get( void )
+{
+    return flash_first_page_start_addr_get() + ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE ) - 1;
+}
 
 static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
 {
