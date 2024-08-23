@@ -68,10 +68,10 @@ extern "C"
     Start address of the last page (127) = 0x0007F000.
     Last address of the last page = 512 * 1024 Bytes = 524288 Bytes = 0x00080000
 
-    Bootloader starts in 0x00077000 (page 119) and ends in 0x0007DF53 (page 125), 7 pages in total.
-    We reserve 2 pages starting from 0x00075000 for the EEPROM class.
-    The Bluetooth module uses the Nordic FDS library, and 3 pages are reserved for it (pages 114,
-    115 and 116).
+    Bootloader starts at 0x00075000 (page 117) and ends at 0x0007DF53 (page 126), 10 pages in total.
+    We reserve 2 pages 0x00073000 and 0x00074000 for the EEPROM class.
+    The Bluetooth module uses the Nordic FDS library, and 3 pages are reserved for it from 0x00070000
+    to 0x00072000 (pages 112, 113 and 114).
     Pages 39 to 113 are free to be used by the main application.
 
     Flash memory map:
@@ -85,15 +85,17 @@ extern "C"
         Page 121 (0x00079000) -> Bootloader.
         Page 120 (0x00078000) -> Bootloader.
         Page 119 (0x00077000) -> Bootloader.
+        Page 118 (0x00076000) -> Bootloader.
+        Page 117 (0x00075000) -> Bootloader.
 
-        Page 118 (0x00076000) -> EEPROM class. It uses fstorage library from the SDK.
-        Page 117 (0x00075000) -> EEPROM class.
+        Page 116 (0x00074000) -> EEPROM class. It uses fstorage library from the SDK.
+        Page 115 (0x00073000) -> EEPROM class.
 
-        Page 116 (0x00074000) -> FDS library used by the peer manager module in the Bluetooth.
-        Page 115 (0x00073000) -> FDS library.
-        Page 114 (0x00072000) -> FDS library.
+        Page 114 (0x00072000) -> FDS library used by the peer manager module in the Bluetooth.
+        Page 113 (0x00071000) -> FDS library.
+        Page 112 (0x00070000) -> FDS library.
 
-        Page 113 (0x00071000) -> Max Main App.
+        Page 113 (0x00069000) -> Max Main App.
         .
         .
         Page 39  (0x00027000) -> Min Main App.
@@ -111,11 +113,11 @@ extern "C"
           used by the EEPROM class. This way it is easier to add memory pages as we need them
           to be used by Kaleidoscope.
 */
-#define FLASH_STORAGE_FIRST_PAGE_START_ADDR     0x00075000
 #define FLASH_STORAGE_NUM_PAGES                 2
-#define FLASH_STORAGE_PAGE_SIZE                 4096 /* Size of the flash pages in Bytes. */
+#define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
 
-#define LAST_PAGE_END_ADDR FLASH_STORAGE_FIRST_PAGE_START_ADDR + (FLASH_STORAGE_PAGE_SIZE * FLASH_STORAGE_NUM_PAGES) - 1
+#define FLASH_STORAGE_FIRST_PAGE_START_ADDR     BOOTLOADER_ADDRESS - FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE
+#define FLASH_STORAGE_LAST_PAGE_END_ADDR        FLASH_STORAGE_FIRST_PAGE_START_ADDR + (FLASH_STORAGE_PAGE_SIZE * FLASH_STORAGE_NUM_PAGES) - 1
 
 
 volatile static bool flag_write_completed = false;
@@ -133,7 +135,7 @@ NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
         last page of flash available to write data.
     */
     .start_addr = FLASH_STORAGE_FIRST_PAGE_START_ADDR,
-    .end_addr = LAST_PAGE_END_ADDR,
+    .end_addr = FLASH_STORAGE_LAST_PAGE_END_ADDR,
 };
 
 static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)

@@ -79,7 +79,7 @@ class Ble_connections
     }
 
   private:
-    pm_peer_id_t peer_id = 0xFFFF;
+    pm_peer_id_t peer_id = PM_PEER_ID_INVALID;  // 0xFFFF | libraries/SDK/nRF5_SDK_17.1.0_ddde560/components/ble/peer_manager/peer_manager_types.h;
     uint8_t device_address[BLE_ADDRESS_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     uint8_t device_name[BLE_DEVICE_NAME_LEN] = {};
 };

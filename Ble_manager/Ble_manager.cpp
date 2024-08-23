@@ -138,7 +138,7 @@ EventHandlerResult BleManager::onSetup(void)
     update_channel_and_name();
     // UX STUFFf
     uint8_t i = 0;
-    for (auto &item : ble_flash_data.ble_connections) // get all the paires devices and store in a variable.
+    for (auto &item : ble_flash_data.ble_connections) // get all the paired devices and store in a variable.
     {
         if (item.get_peer_id() == PM_PEER_ID_INVALID)
         {
@@ -161,7 +161,7 @@ EventHandlerResult BleManager::onSetup(void)
     }
 
 #if BLE_MANAGER_DEBUG_LOG
-    NRF_LOG_DEBUG("Ble_manager: %i channels in total.", channels);
+    NRF_LOG_DEBUG("Ble_manager: %i channels in total.", i);
 #endif
 
     ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
