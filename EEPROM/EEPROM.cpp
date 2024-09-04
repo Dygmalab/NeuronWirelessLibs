@@ -141,9 +141,10 @@ NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
 };
 
 /*
- * The bulk of this function has been taken from Nordic's SDK fds.c module
- */
-static inline uint32_t flash_first_page_start_addr_get( void )
+    This function is used to get the correct flash address even if no bootloader is flashed.
+    The bulk of this function has been taken from Nordic's SDK fds.c module.
+*/
+static inline uint32_t flash_first_page_start_addr_get(void)
 {
     uint32_t const bootloader_addr = BOOTLOADER_ADDRESS;
     uint32_t const page_sz         = NRF_FICR->CODEPAGESIZE;
@@ -159,12 +160,12 @@ static inline uint32_t flash_first_page_start_addr_get( void )
 
     uint32_t end_addr = (bootloader_addr != 0xFFFFFFFF) ? bootloader_addr : (code_sz * page_sz);
 
-    return end_addr - ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE );
+    return end_addr - (FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE);
 }
 
-static inline uint32_t flash_last_page_end_addr_get( void )
+static inline uint32_t flash_last_page_end_addr_get(void)
 {
-    return flash_first_page_start_addr_get() + ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE ) - 1;
+    return flash_first_page_start_addr_get() + (FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE) - 1;
 }
 
 static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)

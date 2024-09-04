@@ -28,6 +28,9 @@
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
 
+#include "Do_once.h"
+
+
 void device_name_evt_handler(void);
 
 namespace kaleidoscope
@@ -35,7 +38,12 @@ namespace kaleidoscope
 namespace plugin
 {
 
+
 #define BLE_MANAGER_DEBUG_LOG   1
+
+
+Do_once clear_pin_digits_count;
+
 
 void BleManager::init(void)
 {
@@ -191,7 +199,11 @@ void BleManager::update_channel_and_name(void)
 
     pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
 
-    if (active_connection_peer_id == PM_PEER_ID_INVALID) // SI no tengo ningun dispositivo en el canal ejecuto el advertising con lista blanca para qu cualquier dispositivo lo encuentre
+    /*
+        If it doesn't have any device on the channel, it goes into advertising mode with a white
+        list so that any device can find it.
+    */
+    if (active_connection_peer_id == PM_PEER_ID_INVALID)
     {
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_INFO("Ble_manager: Whitelist deactivated.");
@@ -465,27 +477,36 @@ EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr
 
     if (keyToggledOff(keyState) && mitm_activated && is_num_key(mappedKey.getRaw()))
     {
-        static uint8_t count = 0;
+        static uint8_t pin_digits_count = 0;
 
-        encryption_pin_number[count] = raw_key_to_ascii(mappedKey.getRaw());
+        encryption_pin_number[pin_digits_count] = raw_key_to_ascii(mappedKey.getRaw());
 
 #if BLE_MANAGER_DEBUG_LOG
-        NRF_LOG_DEBUG("Ble_manager: encryption_pin_number[%d] = %c", count, encryption_pin_number[count]);
+        NRF_LOG_DEBUG("Ble_manager: encryption_pin_number[%d] = %c",
+                      pin_digits_count,
+                      encryption_pin_number[pin_digits_count]);
         NRF_LOG_FLUSH();
 #endif
 
-        count++;
+        pin_digits_count++;
 
-        if (count == 6) // PIN numbers has 6 digits.
+        if (pin_digits_count == 6) // PIN numbers has 6 digits.
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Sending pin number..");
             NRF_LOG_FLUSH();
 #endif
 
-            count = 0;
+            pin_digits_count = 0;
             ble_send_encryption_pin(encryption_pin_number);
             mitm_activated = false;
+
+            clear_pin_digits_count.reset();
+        }
+        else if (get_flag_security_proc_failed() &&
+                clear_pin_digits_count.do_once())
+        {
+            pin_digits_count = 0;
         }
 
         return EventHandlerResult::EVENT_CONSUMED;
