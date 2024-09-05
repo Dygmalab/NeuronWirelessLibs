@@ -32,6 +32,9 @@ class Battery : public Plugin {
     EventHandlerResult onFocusEvent(const char *command);
     EventHandlerResult onKeyswitchEvent(Key &mapped_Key, KeyAddr key_addr, uint8_t key_state);
 
+    static uint8_t get_battery_status_left(void);
+    static uint8_t get_battery_status_right(void);
+
    private:
     static uint8_t battery_level;
     static uint8_t saving_mode;

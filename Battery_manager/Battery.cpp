@@ -25,13 +25,18 @@
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
 
+
 #define NOT_CHARGING 0
+
+
 namespace kaleidoscope
 {
 namespace plugin
 {
 
+
 #define DEBUG_LOG_BATTERY_MANAGER   0
+
 
 uint8_t Battery::battery_level;
 uint8_t Battery::saving_mode;
@@ -40,6 +45,7 @@ uint8_t Battery::status_left = 4;
 uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
+
 
 EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
@@ -67,12 +73,16 @@ EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, u
 
 EventHandlerResult Battery::onFocusEvent(const char *command)
 {
-    if (::Focus.handleHelp(
-            command,
-            "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
+    if (::Focus.handleHelp(command,
+        "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
+    {
         return EventHandlerResult::OK;
+    }
 
-    if (strncmp(command, "wireless.battery.", 17) != 0) return EventHandlerResult::OK;
+    if (strncmp(command, "wireless.battery.", 17) != 0)
+    {
+        return EventHandlerResult::OK;
+    }
 
     if (strcmp(command + 17, "right.level") == 0)
     {
@@ -114,6 +124,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
             Communications_protocol::Packet p{};
             p.header.command = Communications_protocol::BATTERY_STATUS;
             Communications.sendPacket(p);
+
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.left.status");
 #endif
@@ -240,6 +251,28 @@ EventHandlerResult Battery::onSetup()
     }));
 
     return EventHandlerResult::OK;
+}
+
+uint8_t Battery::get_battery_status_left(void)
+{
+    /*
+        0 -> Side connected and powered from its battery or the other side's battery.
+        1 o 2 -> Side connected and powered from the N2 while it is connected to the PC via USB.
+        4 -> Side disconnected.
+    */
+
+    return status_left;
+}
+
+uint8_t Battery::get_battery_status_right(void)
+{
+    /*
+        0 -> Side connected and powered from its battery or the other side's battery.
+        1 o 2 -> Side connected and powered from the N2 while it is connected to the PC via USB.
+        4 -> Side disconnected.
+    */
+
+    return status_right;
 }
 
 } // namespace plugin

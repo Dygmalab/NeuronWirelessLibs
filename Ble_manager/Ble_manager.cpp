@@ -178,6 +178,7 @@ EventHandlerResult BleManager::onSetup(void)
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_FLUSH();
 #endif
+
     return EventHandlerResult::OK;
 }
 
