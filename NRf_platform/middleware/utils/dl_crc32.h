@@ -23,25 +23,17 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __DL_CRC32_H_
+#define __DL_CRC32_H_
+
+#include "dl_middleware.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "types.h"
-#include "dl_assert.h"
-
-#include "memory/heap.h"
-#include "utils/utils.h"
-
-#include "utils/dl_crc32.h"
-
-#include "config_app.h"
-
+extern uint32_t dlcrc32_calculate_data(uint32_t crc32, const uint8_t *_data, size_t len);
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* __DL_CRC32_H_ */
