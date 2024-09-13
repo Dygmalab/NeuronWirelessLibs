@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#include "middleware.h"
+#include "dl_middleware.h"
 #include "hal_config.h"
 #include HAL_MCU_LL_MCU_LINK
 

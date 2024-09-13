@@ -26,7 +26,7 @@
 #ifndef __HAL_MCU_MUTEX_LL_H_
 #define __HAL_MCU_MUTEX_LL_H_
 
-#include "middleware.h"
+#include "dl_middleware.h"
 
 #include "hal_mcu_mutex.h"
 #include "hal_mcu_ll.h"
