@@ -48,8 +48,30 @@ void Log_manager::init(void)
 
 EventHandlerResult Log_manager::onFocusEvent(const char *command)
 {
+    result_t result;
+
     if ( ::Focus.handleHelp(command, logdrv_help_message_get( p_logdrv ) ) )
     {
+        return EventHandlerResult::OK;
+    }
+
+    if (strncmp_P(command, PSTR("log."), 4) != 0)
+    {
+        return EventHandlerResult::OK;
+    }
+
+    if (strncmp_P(command + 4, PSTR("read"), 4) == 0)
+    {
+        legdrv_cmd_read_param_t cmd_read_param;
+
+        result = logdrv_cmd_read( p_logdrv, &cmd_read_param );
+        if( result != RESULT_OK )
+        {
+            return EventHandlerResult::OK;
+        }
+
+        Runtime.serialPort().write( cmd_read_param.logs, cmd_read_param.length );
+
         return EventHandlerResult::OK;
     }
 

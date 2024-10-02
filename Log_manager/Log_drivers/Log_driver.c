@@ -72,6 +72,16 @@ const char * logdrv_help_message_get( logdrv_t * p_logdrv )
     return p_logdrv->p_handlers->help_message_get_fn( p_logdrv->p_instance );
 }
 
+result_t logdrv_cmd_read( logdrv_t * p_logdrv, legdrv_cmd_read_param_t * p_cmd_read_param )
+{
+    if( p_logdrv == NULL || p_logdrv->p_handlers->cmd_read_fn == NULL )
+    {
+        return RESULT_ERR;
+    }
+
+    return p_logdrv->p_handlers->cmd_read_fn( p_logdrv->p_instance, p_cmd_read_param );
+}
+
 void logdrv_poll( logdrv_t * p_logdrv )
 {
     if( p_logdrv == NULL || p_logdrv->p_handlers->poll_fn == NULL )

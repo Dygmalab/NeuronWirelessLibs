@@ -32,9 +32,17 @@ extern "C" {
 
 #include "dl_middleware.h"
 
+/* Parameters */
+typedef struct
+{
+    const char * logs;
+    uint32_t length;
+} legdrv_cmd_read_param_t;
+
 /* Handlers */
 
 typedef const char * ( *logdrv_help_message_get_fn_t )( void * p_instance );
+typedef result_t( *logdrv_cmd_read_fn_t )( void * p_instance, legdrv_cmd_read_param_t * p_cmd_read_param );
 //typedef void( *logdrv_start_fn_t )( void * p_instance );
 //typedef void( *logdrv_stop_fn_t )( void * p_instance );
 typedef void( *logdrv_poll_fn_t )( void * p_instance );
@@ -42,6 +50,7 @@ typedef void( *logdrv_poll_fn_t )( void * p_instance );
 typedef struct
 {
     logdrv_help_message_get_fn_t help_message_get_fn;
+    logdrv_cmd_read_fn_t cmd_read_fn;
     logdrv_poll_fn_t poll_fn;
 } logdrv_handlers_t;
 
@@ -60,6 +69,7 @@ typedef struct logdrv logdrv_t;
 extern result_t logdrv_init( logdrv_t ** pp_logdrv, const logdrv_conf_t * p_conf );
 
 extern const char * logdrv_help_message_get( logdrv_t * p_logdrv );
+extern result_t logdrv_cmd_read( logdrv_t * p_logdrv, legdrv_cmd_read_param_t * p_cmd_read_param );
 extern void logdrv_poll( logdrv_t * p_logdrv );
 
 #ifdef __cplusplus

@@ -24,11 +24,11 @@
  */
 
 #include "flash_logger.h"
-#include "Arduino.h"
+
+#define PSTR(str) (str)
 
 /* Help message */
-static const char * help_message = PSTR( "log.read\n"        /* Read the Logs from the internal buffer*/
-                                         "log.clear" );    /* Clear the internal log */
+static const char * help_message = PSTR( "log.read" );       /* Read the Logs from the internal buffer*/
 
 /* Flash logger instance structure */
 typedef struct
@@ -76,6 +76,14 @@ static INLINE const char * _help_message_get_fn( flashlog_t * p_flashlog )
     return help_message;
 }
 
+static INLINE result_t _cmd_read_fn( flashlog_t * p_flashlog, legdrv_cmd_read_param_t * p_cmd_read_param )
+{
+    p_cmd_read_param->logs = "Hey Alex, this is log for testing the API.";
+    p_cmd_read_param->length = strlen( p_cmd_read_param->logs );
+
+    return RESULT_OK;
+}
+
 /***********************************************************/
 /*                       Log Driver                        */
 /***********************************************************/
@@ -87,9 +95,17 @@ static const char * _logdrv_help_message_get_fn( void * p_instance )
     return _help_message_get_fn( p_flashlog );
 }
 
+static result_t _logdrv_cmd_read_fn( void * p_instance, legdrv_cmd_read_param_t * p_cmd_read_param )
+{
+    flashlog_t * p_flashlog = ( flashlog_t *)p_instance;
+
+    return _cmd_read_fn( p_flashlog, p_cmd_read_param );
+}
+
 static const logdrv_handlers_t logdrv_handlers =
 {
     .help_message_get_fn = _logdrv_help_message_get_fn,
+    .cmd_read_fn = _logdrv_cmd_read_fn,
     .poll_fn = NULL,
 };
 
