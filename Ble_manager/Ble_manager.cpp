@@ -251,10 +251,17 @@ EventHandlerResult BleManager::beforeEachCycle(void)
 
     // Gives time to the EPPROM to update
     static bool activated_advertising = false;
+    static uint64_t last_connection_timestamp = 0;
+    uint64_t current_timestamp = millis();
+
     if (ble_is_advertising_mode())
     {
-        // Just activate once
-        if (!activated_advertising)
+        // Just activate once. Let't do it with a delay to filter the high-duty reconnection situations. The timeout is chosen higher
+        // than the BLE startup decision time ( see "actualTime" currently set to 3 seconds in Defy_wireles.cpp and Raise2.cpp). This
+        // will stop short BLE effect flicker when the device is being started.
+        // However, there is no connection between these two timeouts currently and, thus, any change might bring the flicker back.
+        // This needs to be handled better in the future.
+        if (!activated_advertising && ( current_timestamp - last_connection_timestamp >= 4000 ))
         {
             // set_pairing_led_effect();
 
@@ -269,17 +276,22 @@ EventHandlerResult BleManager::beforeEachCycle(void)
             activated_advertising = true;
         }
     }
-    else if (activated_advertising && ble_connected())
+    else if( ble_connected() )
     {
-        ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
-        ledBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
-        set_paired_channel_led(ble_flash_data.currentChannel, true);
-        send_led_mode();
-        ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
-        activated_advertising = false;
-        exit_pairing_mode();
+        last_connection_timestamp = current_timestamp;
 
-        trigger_save_conn_timer = true;
+        if ( activated_advertising )
+        {
+            ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
+            ledBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
+            set_paired_channel_led(ble_flash_data.currentChannel, true);
+            send_led_mode();
+            ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
+            activated_advertising = false;
+            exit_pairing_mode();
+
+            trigger_save_conn_timer = true;
+        }
     }
     else if (activated_advertising && ble_is_idle())
     {
