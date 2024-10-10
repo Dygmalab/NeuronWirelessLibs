@@ -50,7 +50,7 @@
 #include "Ble_composite_dev.h"
 #include "CRC_wrapper.h"
 
-#define SPILS_MESSAGE_SIZE_MAX      SPI_SLAVE_PACKET_SIZE
+#define SPILS_MESSAGE_SIZE_MAX      (SPI_SLAVE_PACKET_SIZE * 4)
 
 typedef struct
 {
@@ -179,30 +179,50 @@ void Spi_slave::run(void)
     data_out_process( );
 }
 
+
+void Spi_slave::packet_in_process( Communications_protocol::Packet * p_spi_packet )
+{
+    uint8_t spi_packet_crc;
+
+    /* Parse the packet */
+    spi_packet_crc = p_spi_packet->header.crc;
+    p_spi_packet->header.crc = 0;
+    if ( crc8(p_spi_packet->buf, sizeof(Communications_protocol::Header) + p_spi_packet->header.size) == spi_packet_crc ) {
+        spi_rx_fifo.put(p_spi_packet);  // Put the new spi_packet in the Rx FIFO.
+    }
+}
+
 void Spi_slave::data_in_process(void)
 {
     result_t result = RESULT_ERR;
-    Communications_protocol::Packet spi_packet;
+
+    Communications_protocol::Packet * p_spi_packet_in;
+    Communications_protocol::Packet spi_packet_out;
+
+    uint8_t p_data[SPILS_MESSAGE_SIZE_MAX];
+    uint16_t data_pos = 0;
     uint16_t data_in_len;
-    uint8_t spi_packet_crc;
 
     if( spils_data_in_received == false )
     {
         return;
     }
 
-    data_in_len = sizeof( spi_packet.buf );
-    result = spils_data_read(p_spils, spi_packet.buf, &data_in_len );
-    ASSERT_DYGMA( data_in_len == sizeof( spi_packet.buf ), "Invalide size of the SPI slave packet received" );
+    memset( p_data, 0x00, sizeof(p_data) );
+
+    result = spils_data_read( p_spils, p_data, &data_in_len );
+    ASSERT_DYGMA( (data_in_len % sizeof(Communications_protocol::Packet) ) == 0, "Invalid size of the SPI slave packet received" );
     EXIT_IF_NOK(result);
 
     spils_data_in_received = spils_data_read_available( p_spils );
 
-    /* Parse the packet */
-    spi_packet_crc = spi_packet.header.crc;
-    spi_packet.header.crc = 0;
-    if (crc8(spi_packet.buf, sizeof(Communications_protocol::Header) + spi_packet.header.size) == spi_packet_crc) {
-        spi_rx_fifo.put(&spi_packet);  // Put the new spi_packet in the Rx FIFO.
+    while( data_in_len >= sizeof(Communications_protocol::Packet) )
+    {
+        p_spi_packet_in = ( Communications_protocol::Packet *)&p_data[data_pos];
+        packet_in_process( p_spi_packet_in );
+
+        data_pos += sizeof(Communications_protocol::Packet);
+        data_in_len -= sizeof(Communications_protocol::Packet);
     }
 
     /* Check if there are packets in the output fifo */
@@ -212,13 +232,13 @@ void Spi_slave::data_in_process(void)
         return;
     }
 
-    memset( &spi_packet, 0x00, sizeof( spi_packet ) );
+    memset( &spi_packet_out, 0x00, sizeof( spi_packet_out ) );
 
     /* Prepare the IS_ALIVE packet */
-    spi_packet.header.device = (ble_innited()) ? Communications_protocol::BLE_NEURON_2_DEFY : Communications_protocol::NEURON_DEFY;
-    spi_packet.header.command = Communications_protocol::IS_ALIVE;
+    spi_packet_out.header.device = (ble_innited()) ? Communications_protocol::BLE_NEURON_2_DEFY : Communications_protocol::NEURON_DEFY;
+    spi_packet_out.header.command = Communications_protocol::IS_ALIVE;
 
-    spi_tx_fifo.put( &spi_packet );
+    spi_tx_fifo.put( &spi_packet_out );
 
 _EXIT:
     return;
