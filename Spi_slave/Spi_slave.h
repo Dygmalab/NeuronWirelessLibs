@@ -132,6 +132,7 @@ class Spi_slave {
 
     static void spils_event_handler( void * p_instance, spils_event_type_t event_type );
 
+    void packet_in_process( Communications_protocol::Packet * p_spi_packet );
     void data_in_process(void);
     void data_out_process(void);
 };
