@@ -80,7 +80,6 @@ extern "C" {
 }
 #endif
 
-#include <queue>
 #include <Communications_protocol.h>
 #include "Fifo_buffer.h"
 #include "spi_link_slave.h"
