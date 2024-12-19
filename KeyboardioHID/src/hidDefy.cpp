@@ -32,6 +32,12 @@ THE SOFTWARE.
 #include "MultiReport/Keyboard.h"
 #include "ble_hid_service.h"
 
+/*
+ * Extern functions for providing the HID report descriptor. Needs to be defined on the application level.
+ */
+extern void hid_report_descriptor_usb_get( const uint8_t ** pp_desc, uint32_t * p_desc_len );
+extern void hid_report_descriptor_ble_get( const uint8_t ** pp_desc, uint32_t * p_desc_len );
+
 HID_ &HID()
 {
     static HID_ obj;
@@ -139,68 +145,6 @@ bool HID_::SendLastReport()
     return success;
 }
 
-
-enum
-{
-    REPORT_ID_KEYBOARD = 1,
-    REPORT_ID_MOUSE,
-    REPORT_ID_CONSUMER_CONTROL,
-    REPORT_ID_SYSTEM_CONTROL,
-    REPORT_ID_RAW
-};
-
-#define INPUT_REPORT_LEN_RAW 200  /**< Maximum length of the Input Report characteristic. */
-#define OUTPUT_REPORT_LEN_RAW 200 /**< Maximum length of Output Report. */
-
-
-// clang-format off
-// Consumer Control Report Descriptor Template
-#define TUD_HID_REPORT_DESC_CONSUMER_DYGMA(...) \
-HID_USAGE_PAGE ( HID_USAGE_PAGE_CONSUMER    )              ,\
-HID_USAGE      ( HID_USAGE_CONSUMER_CONTROL )              ,\
-HID_COLLECTION ( HID_COLLECTION_APPLICATION )              , /* Report ID if any */\
- __VA_ARGS__ \
- HID_LOGICAL_MIN  ( 0x00                                ) ,\
- HID_LOGICAL_MAX_N( 0x03FF, 2                           ) ,\
- HID_USAGE_MIN    ( 0x00                                ) ,\
- HID_USAGE_MAX_N  ( 0x03FF, 2                           ) ,\
- HID_REPORT_COUNT ( 4                                   ) ,\
- HID_REPORT_SIZE  ( 16                                  ) ,\
- HID_INPUT        ( HID_DATA | HID_ARRAY | HID_ABSOLUTE ) ,\
-HID_COLLECTION_END                            \
-/*Enable back clang*/
-// clang-format on
-
-uint8_t const hid_report_descriptor[] = {
-    D_USAGE_PAGE, D_PAGE_GENERIC_DESKTOP, D_USAGE, D_USAGE_KEYBOARD, D_COLLECTION, D_APPLICATION, D_REPORT_ID, HID_REPORTID_NKRO_KEYBOARD, D_USAGE_PAGE,
-    D_PAGE_KEYBOARD,
-
-    /* Key modifier byte */
-    D_USAGE_MINIMUM, HID_KEYBOARD_FIRST_MODIFIER, D_USAGE_MAXIMUM, HID_KEYBOARD_LAST_MODIFIER, D_LOGICAL_MINIMUM, 0x00, D_LOGICAL_MAXIMUM, 0x01, D_REPORT_SIZE, 0x01,
-    D_REPORT_COUNT, 0x08, D_INPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),
-
-    /* 5 LEDs for num lock etc, 3 left for advanced, custom usage */
-    D_USAGE_PAGE, D_PAGE_LEDS, D_USAGE_MINIMUM, 0x01, D_USAGE_MAXIMUM, 0x08, D_REPORT_COUNT, 0x08, D_REPORT_SIZE, 0x01, D_OUTPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),
-
-    /* NKRO Keyboard */
-    D_USAGE_PAGE, D_PAGE_KEYBOARD,
-
-    // Padding 4 bits, to skip NO_EVENT & 3 error states.
-    D_REPORT_SIZE, 0x04, D_REPORT_COUNT, 0x01, D_INPUT, (D_CONSTANT),
-
-    D_USAGE_MINIMUM, HID_KEYBOARD_A_AND_A, D_USAGE_MAXIMUM, HID_LAST_KEY, D_LOGICAL_MINIMUM, 0x00, D_LOGICAL_MAXIMUM, 0x01, D_REPORT_SIZE, 0x01, D_REPORT_COUNT,
-    (KEY_BITS - 4), D_INPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),
-
-#if (KEY_BITS % 8)
-    // Padding to round up the report to byte boundary.
-    D_REPORT_SIZE, (8 - (KEY_BITS % 8)), D_REPORT_COUNT, 0x01, D_INPUT, (D_CONSTANT),
-#endif
-
-    D_END_COLLECTION, TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)), TUD_HID_REPORT_DESC_CONSUMER_DYGMA(HID_REPORT_ID(REPORT_ID_CONSUMER_CONTROL)),
-    TUD_HID_REPORT_DESC_SYSTEM_CONTROL(HID_REPORT_ID(REPORT_ID_SYSTEM_CONTROL)),
-    TUD_HID_REPORT_DESC_GENERIC_INOUT(OUTPUT_REPORT_LEN_RAW, HID_REPORT_ID(REPORT_ID_RAW))};
-
-
 HID_::HID_() : protocol(HID_REPORT_PROTOCOL), idle(0)
 {
     setReportData.reportId = 0;
@@ -209,12 +153,22 @@ HID_::HID_() : protocol(HID_REPORT_PROTOCOL), idle(0)
 
 int HID_::begin()
 {
-    const uint8_t sizeRawHID[] = {TUD_HID_REPORT_DESC_GENERIC_INOUT(OUTPUT_REPORT_LEN_RAW, HID_REPORT_ID(REPORT_ID_RAW))};
+    const uint8_t * p_descriptor;
+    uint32_t descriptor_len;
+
+    /* Set the USB HID report descriptor */
+    hid_report_descriptor_usb_get( &p_descriptor, &descriptor_len );
+
     usb_hid.setPollInterval(1);
-    usb_hid.setReportDescriptor(hid_report_descriptor, sizeof(hid_report_descriptor)-sizeof(sizeRawHID));
-    ble_set_report_descriptor(hid_report_descriptor, sizeof(hid_report_descriptor));
+    usb_hid.setReportDescriptor(p_descriptor, descriptor_len);
     usb_hid.setBootProtocol(0);
     usb_hid.begin();
     tu_fifo_config(&tx_ff_hid, tx_ff_buf_hid, TU_ARRAY_SIZE(tx_ff_buf_hid), 1, true);
+
+    /* Set the BLE HID report descriptor */
+    hid_report_descriptor_ble_get( &p_descriptor, &descriptor_len );
+
+    ble_set_report_descriptor(p_descriptor, descriptor_len);
+
     return 0;
 }

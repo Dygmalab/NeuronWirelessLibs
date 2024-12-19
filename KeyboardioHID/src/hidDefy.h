@@ -31,6 +31,10 @@ THE SOFTWARE.
 #include "HID-Settings.h"
 #include <Adafruit_TinyUSB.h>
 
+#include "DescriptorPrimitives.h"
+#include "MultiReport/Keyboard.h"
+#include "ble_hid_service.h"
+
 
 #define _USING_HID
 
@@ -73,11 +77,34 @@ class HIDSubDescriptor {
   const uint16_t length;
 };
 
-enum {
-  RID_KEYBOARD = 1,
-  RID_MOUSE,
-  RID_CONSUMER_CONTROL, // Media, volume etc ..
+enum
+{
+    REPORT_ID_KEYBOARD = 0x01,
+    REPORT_ID_MOUSE = 0x02,
+    REPORT_ID_CONSUMER_CONTROL = 0x03,     // Media, volume etc ..
+    REPORT_ID_SYSTEM_CONTROL = 0x04,
+    REPORT_ID_RAW = 0x05
 };
+
+#if 0
+/*
+ * This is future definition of Dygma keyboard layouts. Uncomment this when the Bazecor is ready.
+ */
+enum
+{
+    RAW_USAGE_UNKNOWN = 0x00,
+    RAW_USAGE_ANSI = 0x01,
+    RAW_USAGE_ISO = 0x02,
+    RAW_USAGE_DEFY = 0x03,
+};
+#else
+
+#define RAW_USAGE_UNKNOWN   0x01
+#define RAW_USAGE_ANSI      0x01
+#define RAW_USAGE_ISO       0x01
+#define RAW_USAGE_DEFY      0x01
+
+#endif
 
 class HID_ {
  public:
@@ -87,6 +114,8 @@ class HID_ {
   int SendReport(uint8_t id, const void* data, int len);
   bool SendLastReport();
   void AppendDescriptor(HIDSubDescriptor* node);
+
+  void hid_report_descriptor_get( const uint8_t ** pp_desc, uint32_t * p_desc_len );
 
   uint8_t getLEDs() {
     return setReportData.leds;
@@ -113,5 +142,93 @@ private:
 HID_& HID();
 
 #define D_HIDREPORT(length) { 9, 0x21, 0x01, 0x01, 0, 1, 0x22, lowByte(length), highByte(length) }
+
+/*******************************************************/
+/*               HID descriptor builder                */
+/*******************************************************/
+
+// clang-format off
+// Consumer Control Report Descriptor Template
+#define TUD_HID_REPORT_DESC_CONSUMER_DYGMA(...) \
+HID_USAGE_PAGE ( HID_USAGE_PAGE_CONSUMER    )              ,\
+HID_USAGE      ( HID_USAGE_CONSUMER_CONTROL )              ,\
+HID_COLLECTION ( HID_COLLECTION_APPLICATION )              , /* Report ID if any */\
+ __VA_ARGS__ \
+ HID_LOGICAL_MIN  ( 0x00                                ) ,\
+ HID_LOGICAL_MAX_N( 0x03FF, 2                           ) ,\
+ HID_USAGE_MIN    ( 0x00                                ) ,\
+ HID_USAGE_MAX_N  ( 0x03FF, 2                           ) ,\
+ HID_REPORT_COUNT ( 4                                   ) ,\
+ HID_REPORT_SIZE  ( 16                                  ) ,\
+ HID_INPUT        ( HID_DATA | HID_ARRAY | HID_ABSOLUTE ) ,\
+HID_COLLECTION_END                            \
+/*Enable back clang*/
+// clang-format on
+
+// HID Generic Input & Output
+// - 1st parameter is report size (mandatory)
+// - 2nd parameter is report id HID_REPORT_ID(n) (optional)
+#define TUD_HID_REPORT_DESC_GENERIC_INOUT_DYGMA(report_size, usage, ...) \
+    HID_USAGE_PAGE_N ( HID_USAGE_PAGE_VENDOR, 2   ),\
+    HID_USAGE        ( usage                      ),\
+    HID_COLLECTION   ( HID_COLLECTION_APPLICATION ),\
+      /* Report ID if any */\
+      __VA_ARGS__ \
+      /* Input */ \
+      HID_USAGE       ( 0x02                                   ),\
+      HID_LOGICAL_MIN ( 0x00                                   ),\
+      HID_LOGICAL_MAX_N ( 0xff, 2                              ),\
+      HID_REPORT_SIZE ( 8                                      ),\
+      HID_REPORT_COUNT( report_size                            ),\
+      HID_INPUT       ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),\
+      /* Output */ \
+      HID_USAGE       ( 0x03                                    ),\
+      HID_LOGICAL_MIN ( 0x00                                    ),\
+      HID_LOGICAL_MAX_N ( 0xff, 2                               ),\
+      HID_REPORT_SIZE ( 8                                       ),\
+      HID_REPORT_COUNT( report_size                             ),\
+      HID_OUTPUT      ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE  ),\
+    HID_COLLECTION_END \
+
+#if (KEY_BITS % 8)
+    /* Padding to round up the report to byte boundary. */
+#define KEYBITS_PADDING    D_REPORT_SIZE, (8 - (KEY_BITS % 8)), D_REPORT_COUNT, 0x01, D_INPUT, (D_CONSTANT),
+#else
+#define KEYBITS_PADDING
+#endif
+
+#define HID_DEFY_REPORT_DESCRIPTOR( usage_raw ) {                                                                                           \
+    D_USAGE_PAGE, D_PAGE_GENERIC_DESKTOP, D_USAGE, D_USAGE_KEYBOARD, D_COLLECTION, D_APPLICATION, D_REPORT_ID, HID_REPORTID_NKRO_KEYBOARD,      \
+    D_USAGE_PAGE, D_PAGE_KEYBOARD,                                                                                                              \
+                                                                                                                                                \
+    /* Key modifier byte */                                                                                                                     \
+    D_USAGE_MINIMUM, HID_KEYBOARD_FIRST_MODIFIER, D_USAGE_MAXIMUM, HID_KEYBOARD_LAST_MODIFIER,                                                  \
+    D_LOGICAL_MINIMUM, 0x00, D_LOGICAL_MAXIMUM, 0x01, D_REPORT_SIZE, 0x01, D_REPORT_COUNT, 0x08,                                                \
+    D_INPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),                                                                                                \
+                                                                                                                                                \
+    /* 5 LEDs for num lock etc, 3 left for advanced, custom usage */                                                                            \
+    D_USAGE_PAGE, D_PAGE_LEDS, D_USAGE_MINIMUM, 0x01, D_USAGE_MAXIMUM, 0x08, D_REPORT_COUNT, 0x08, D_REPORT_SIZE, 0x01,                         \
+    D_OUTPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),                                                                                               \
+                                                                                                                                                \
+    /* NKRO Keyboard */                                                                                                                         \
+    D_USAGE_PAGE, D_PAGE_KEYBOARD,                                                                                                              \
+                                                                                                                                                \
+    /* Padding 4 bits, to skip NO_EVENT & 3 error states. */                                                                                    \
+    D_REPORT_SIZE, 0x04, D_REPORT_COUNT, 0x01, D_INPUT, (D_CONSTANT),                                                                           \
+                                                                                                                                                \
+    D_USAGE_MINIMUM, HID_KEYBOARD_A_AND_A, D_USAGE_MAXIMUM, HID_LAST_KEY,                                                                       \
+    D_LOGICAL_MINIMUM, 0x00, D_LOGICAL_MAXIMUM, 0x01, D_REPORT_SIZE, 0x01,                                                                      \
+    D_REPORT_COUNT, (KEY_BITS - 4), D_INPUT, (D_DATA | D_VARIABLE | D_ABSOLUTE),                                                                \
+                                                                                                                                                \
+    /* Padding to round up the report to byte boundary. */                                                                                      \
+    KEYBITS_PADDING                                                                                                                             \
+                                                                                                                                                \
+    D_END_COLLECTION,                                                                                                                           \
+                                                                                                                                                \
+    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)),                                                                                  \
+    TUD_HID_REPORT_DESC_CONSUMER_DYGMA(HID_REPORT_ID(REPORT_ID_CONSUMER_CONTROL)),                                                              \
+    TUD_HID_REPORT_DESC_SYSTEM_CONTROL(HID_REPORT_ID(REPORT_ID_SYSTEM_CONTROL)),                                                                \
+    TUD_HID_REPORT_DESC_GENERIC_INOUT_DYGMA(OUTPUT_REPORT_LEN_RAW, usage_raw, HID_REPORT_ID(REPORT_ID_RAW))                                                      \
+}
 
 #endif // HID_h

@@ -202,6 +202,10 @@ bool Keyboard_::wasAnyModifierActive() {
   return last_report_.modifiers > 0;
 }
 
+uint8_t Keyboard_::getLEDs()
+{
+    return HID().getLEDs();
+};
 
 /* Returns true if the non-modifier key passed in will be sent during this key report
  * Returns false in all other cases
