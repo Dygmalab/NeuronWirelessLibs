@@ -86,6 +86,10 @@ enum
     REPORT_ID_RAW = 0x05
 };
 
+#if 0
+/*
+ * This is future definition of Dygma keyboard layouts. Uncomment this when the Bazecor is ready.
+ */
 enum
 {
     RAW_USAGE_UNKNOWN = 0x00,
@@ -93,6 +97,14 @@ enum
     RAW_USAGE_ISO = 0x02,
     RAW_USAGE_DEFY = 0x03,
 };
+#else
+
+#define RAW_USAGE_UNKNOWN   0x01
+#define RAW_USAGE_ANSI      0x01
+#define RAW_USAGE_ISO       0x01
+#define RAW_USAGE_DEFY      0x01
+
+#endif
 
 class HID_ {
  public:
