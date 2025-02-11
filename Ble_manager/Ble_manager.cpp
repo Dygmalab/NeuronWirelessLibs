@@ -27,7 +27,7 @@
 #include "cstdio"
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
-#include "DefyFirmwareVersion.h"
+#include "FirmwareVersion.h"
 
 #include "Do_once.h"
 
