@@ -27,6 +27,7 @@
 #include "cstdio"
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
+#include "FirmwareVersion.h"
 
 #include "Do_once.h"
 
@@ -222,7 +223,7 @@ void BleManager::update_channel_and_name(void)
 
 EventHandlerResult BleManager::beforeEachCycle(void)
 {
-    if (!ble_innited())
+    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
     {
         return EventHandlerResult::OK;
     }
