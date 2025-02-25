@@ -41,6 +41,7 @@ namespace plugin
 class Ble_connections
 {
   public:
+
     void set_peer_id(uint16_t id)
     {
         peer_id = id;
@@ -121,7 +122,14 @@ class BleManager : public Plugin
     void setForceBle(bool enabled);
     void set_bt_name_from_specifications(const char *spec);
 
+    void set_pairing_key_press(bool press);
+    bool get_pairing_key_press(void);
+
+    void send_led_mode(void);
   private:
+
+    bool pairing_key_press = false;
+
     enum Channels: uint8_t
     {
         CHANNEL_0,
@@ -178,7 +186,7 @@ class BleManager : public Plugin
     void save_device_name(void);
 
     void set_paired_channel_led(uint8_t channel, bool turnOn);
-    void send_led_mode(void);
+
     void set_channel_in_use(KeyAddr channel_in_use_);
     void erase_paired_device(uint8_t index_channel);
     bool is_num_key(uint16_t raw_key);

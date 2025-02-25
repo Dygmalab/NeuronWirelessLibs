@@ -460,6 +460,16 @@ void BleManager::save_device_name(void)
     }
 }
 
+void BleManager::set_pairing_key_press(bool press)
+{
+    pairing_key_press = press;
+}
+
+bool BleManager::get_pairing_key_press(void)
+{
+    return pairing_key_press;
+}
+
 EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
     /* Exit conditions. */
@@ -480,7 +490,10 @@ EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr
                 Runtime.storage().put(flash_base_addr, ble_flash_data);
                 Runtime.storage().commit();
 
+                set_pairing_key_press(true);
+
                 reset_mcu();
+
             }
         }
         else
