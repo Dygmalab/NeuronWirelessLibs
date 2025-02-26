@@ -50,7 +50,8 @@
 #include "Ble_composite_dev.h"
 #include "CRC_wrapper.h"
 
-#define SPILS_MESSAGE_SIZE_MAX      (SPI_SLAVE_PACKET_SIZE * 4)
+#define SPILS_MESSAGE_SIZE_MAX          (SPI_SLAVE_PACKET_SIZE * 4)
+#define SPILS_DISCONNECT_TIMEOUT_MS     1000
 
 typedef struct
 {
@@ -89,6 +90,18 @@ void Spi_slave::spils_event_handler( void * p_instance, spils_event_type_t event
 
     switch( event_type )
     {
+        case SPILS_EVENT_TYPE_DISCONNECTED:
+
+            p_slave->is_connected_ = false;
+
+            break;
+
+        case SPILS_EVENT_TYPE_CONNECTED:
+
+            p_slave->is_connected_ = true;
+
+            break;
+
         case SPILS_EVENT_TYPE_DATA_IN_READY:
 
             p_slave->spils_data_in_received = true;
@@ -161,6 +174,9 @@ void Spi_slave::init(void)
     /* Cache */
     config.message_size_max = SPILS_MESSAGE_SIZE_MAX;
 
+    /* Connection */
+    config.disconnect_timeout_ms = SPILS_DISCONNECT_TIMEOUT_MS;
+
     /* Event handlers */
     config.p_instance = this;
     config.event_handler = spils_event_handler;
@@ -175,10 +191,16 @@ _EXIT:
 
 void Spi_slave::run(void)
 {
+    spils_poll( p_spils );
+
     data_in_process( );
     data_out_process( );
 }
 
+bool_t Spi_slave::is_connected(void)
+{
+    return is_connected_;
+}
 
 void Spi_slave::packet_in_process( Communications_protocol::Packet * p_spi_packet )
 {
@@ -197,7 +219,6 @@ void Spi_slave::data_in_process(void)
     result_t result = RESULT_ERR;
 
     Communications_protocol::Packet * p_spi_packet_in;
-    Communications_protocol::Packet spi_packet_out;
 
     uint8_t p_data[SPILS_MESSAGE_SIZE_MAX];
     uint16_t data_pos = 0;
