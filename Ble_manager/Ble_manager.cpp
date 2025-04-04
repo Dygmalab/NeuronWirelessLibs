@@ -252,8 +252,6 @@ EventHandlerResult BleManager::beforeEachCycle(void)
 
     // Gives time to the EPPROM to update
     static bool activated_advertising = false;
-    static uint64_t last_connection_timestamp = 0;
-    uint64_t current_timestamp = millis();
 
     if (ble_is_advertising_mode())
     {
@@ -275,8 +273,6 @@ EventHandlerResult BleManager::beforeEachCycle(void)
     }
     else if( ble_connected() )
     {
-        last_connection_timestamp = current_timestamp;
-
         if ( activated_advertising )
         {
             ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
