@@ -257,12 +257,8 @@ EventHandlerResult BleManager::beforeEachCycle(void)
 
     if (ble_is_advertising_mode())
     {
-        // Just activate once. Let't do it with a delay to filter the high-duty reconnection situations. The timeout is chosen higher
-        // than the BLE startup decision time ( see "actualTime" currently set to 3 seconds in Defy_wireles.cpp and Raise2.cpp). This
-        // will stop short BLE effect flicker when the device is being started.
-        // However, there is no connection between these two timeouts currently and, thus, any change might bring the flicker back.
-        // This needs to be handled better in the future.
-        if (!activated_advertising && ( current_timestamp - last_connection_timestamp >= 4000 ))
+        // Just activate once.
+        if (!activated_advertising )
         {
             // set_pairing_led_effect();
 
