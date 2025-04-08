@@ -467,7 +467,7 @@ EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr
     /* Exit conditions. */
     if (!ble_innited())
     {
-        if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOn(keyState))
+        if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOn(keyState) && FirmwareVersion::keyboard_is_wireless())
         {
             auto const &keyScanner = Runtime.device().keyScanner();
             auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
