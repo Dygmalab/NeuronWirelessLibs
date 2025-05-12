@@ -43,10 +43,6 @@ extern "C"
 
 #include "nrf_drv_timer.h"
 
-#ifdef __cplusplus
-}
-#endif
-
 // Set parameters:
 #define TIMER_NUMBER 4                         // Timer used for generate the compare events for increment the millis and micros counters.
 #define TIMER_CC_CHANNEL NRF_TIMER_CC_CHANNEL0 // CC channel used for generate the millis interrupt: NRF_TIMER_CC_CHANNEL0, NRF_TIMER_CC_CHANNEL1, ..
@@ -74,8 +70,18 @@ extern "C"
 #define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE5_CLEAR_MASK
 #endif
 
+typedef uint64_t dl_timer_t;
+
 void timer_counter_init(uint32_t micros_resolution);
 uint64_t timer_counter_get_millis(void);
 uint64_t timer_counter_get_micros(void);
+
+void timer_set_ms( dl_timer_t * p_timer, uint32_t ms );
+void timer_set_us( dl_timer_t * p_timer, uint32_t us );
+bool timer_check( dl_timer_t * p_timer );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __TIME_COUNTER_NRF__

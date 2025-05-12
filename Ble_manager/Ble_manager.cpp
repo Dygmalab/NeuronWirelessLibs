@@ -27,6 +27,7 @@
 #include "cstdio"
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
+#include "FirmwareVersion.h"
 
 #include "Do_once.h"
 
@@ -222,7 +223,7 @@ void BleManager::update_channel_and_name(void)
 
 EventHandlerResult BleManager::beforeEachCycle(void)
 {
-    if (!ble_innited())
+    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
     {
         return EventHandlerResult::OK;
     }
@@ -251,17 +252,11 @@ EventHandlerResult BleManager::beforeEachCycle(void)
 
     // Gives time to the EPPROM to update
     static bool activated_advertising = false;
-    static uint64_t last_connection_timestamp = 0;
-    uint64_t current_timestamp = millis();
 
     if (ble_is_advertising_mode())
     {
-        // Just activate once. Let't do it with a delay to filter the high-duty reconnection situations. The timeout is chosen higher
-        // than the BLE startup decision time ( see "actualTime" currently set to 3 seconds in Defy_wireles.cpp and Raise2.cpp). This
-        // will stop short BLE effect flicker when the device is being started.
-        // However, there is no connection between these two timeouts currently and, thus, any change might bring the flicker back.
-        // This needs to be handled better in the future.
-        if (!activated_advertising && ( current_timestamp - last_connection_timestamp >= 4000 ))
+        // Just activate once.
+        if (!activated_advertising )
         {
             // set_pairing_led_effect();
 
@@ -278,8 +273,6 @@ EventHandlerResult BleManager::beforeEachCycle(void)
     }
     else if( ble_connected() )
     {
-        last_connection_timestamp = current_timestamp;
-
         if ( activated_advertising )
         {
             ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
@@ -459,12 +452,22 @@ void BleManager::save_device_name(void)
     }
 }
 
+void BleManager::set_pairing_key_press(bool press)
+{
+    pairing_key_press = press;
+}
+
+bool BleManager::get_pairing_key_press(void)
+{
+    return pairing_key_press;
+}
+
 EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
     /* Exit conditions. */
     if (!ble_innited())
     {
-        if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOn(keyState))
+        if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOn(keyState) && FirmwareVersion::keyboard_is_wireless())
         {
             auto const &keyScanner = Runtime.device().keyScanner();
             auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
@@ -479,7 +482,10 @@ EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr
                 Runtime.storage().put(flash_base_addr, ble_flash_data);
                 Runtime.storage().commit();
 
+                set_pairing_key_press(true);
+
                 reset_mcu();
+
             }
         }
         else

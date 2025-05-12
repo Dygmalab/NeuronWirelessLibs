@@ -95,3 +95,18 @@ uint64_t timer_counter_get_millis(void)
 {
     return (global_microseconds / 1000);
 }
+
+void timer_set_ms( dl_timer_t * p_timer, uint32_t ms )
+{
+    *p_timer = global_microseconds + ( ms * 1000 );
+}
+
+void timer_set_us( dl_timer_t * p_timer, uint32_t us )
+{
+    *p_timer = global_microseconds + us;
+}
+
+bool timer_check( dl_timer_t * p_timer )
+{
+    return ( global_microseconds >= *p_timer ) ? true : false;
+}

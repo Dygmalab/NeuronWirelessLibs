@@ -24,6 +24,7 @@
 #include "Kaleidoscope-FocusSerial.h"
 #include "kaleidoscope/key_events.h"
 #include "kaleidoscope/plugin/LEDControlDefy.h"
+#include "FirmwareVersion.h"
 
 
 #define NOT_CHARGING 0
@@ -49,12 +50,12 @@ uint8_t Battery::battery_level_right = 100;
 
 EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
-    if (mappedKey.getRaw() != ranges::BATTERY_LEVEL)
+    if (mappedKey.getRaw() != ranges::BATTERY_LEVEL )
     {
         return EventHandlerResult::OK;
     }
 
-    if (keyToggledOn(keyState))
+    if (keyToggledOn(keyState) &&  FirmwareVersion::keyboard_is_wireless())
     {
         ::LEDControl.set_mode(9);
         ::LEDControl.set_force_mode(true);
