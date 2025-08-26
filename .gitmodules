@@ -18,3 +18,7 @@
 [submodule "NeuronLedLibrary"]
 	path = NeuronLedLibrary
 	url = git@github.com:Dygmalab/NeuronLedLibrary.git
+[submodule "kaleidoscope_adapter"]
+	path = kaleidoscope_adapter
+	url = git@github.com:Dygmalab/kaleidoscope_adapter.git
+	branch = main
