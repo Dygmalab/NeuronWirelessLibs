@@ -1,20 +1,20 @@
-[submodule "libraries/UpgradeKeyscanner"]
+[submodule "UpgradeKeyscanner"]
 	path = UpgradeKeyscanner
 	url = git@github.com:Dygmalab/KaleidoscopePluginKeyScannerUpgrade.git
-[submodule "libraries/Communications"]
+[submodule "Communications"]
 	path = Communications
 	url = git@github.com:Dygmalab/DefyCommunications.git
 	branch = of-rf_host_lib_integration
-[submodule "libraries/Arduino"]
+[submodule "Arduino"]
 	path = Arduino
 	url = git@github.com:Dygmalab/Arduino_NRF5.git
-[submodule "libraries/Ble_composite_dev"]
+[submodule "Ble_composite_dev"]
 	path = Ble_composite_dev
 	url = git@github.com:Dygmalab/Ble_composite_dev.git
-[submodule "libraries/rf_host_device/rf_host_device"]
+[submodule "rf_host_device/rf_host_device"]
 	path = rf_host_device/rf_host_device
 	url = git@github.com:Dygmalab/rf_host_device.git
 	branch = main
-[submodule "libraries/NeuronLedLibrary"]
+[submodule "NeuronLedLibrary"]
 	path = NeuronLedLibrary
 	url = git@github.com:Dygmalab/NeuronLedLibrary.git
