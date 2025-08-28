@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,25 +23,40 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __DL_TYPES_H_
+#define __DL_TYPES_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "dl_types.h"
-#include "dl_assert.h"
+/*
+ * DO NOT MODIFY!!!
+ *
+ * The Dygma core is used among various Dygma frameworks to assure the same coding philosophy
+ * and prevent conflicts when used together in a project.
+ */
+#ifndef DYGMA_CORE_TYPES_SPECIFIED
+#define DYGMA_CORE_TYPES_SPECIFIED
 
-#include "memory/heap.h"
-#include "utils/utils.h"
+    #define INLINE inline
+    #define VOLATILE volatile
+    #define PACK __attribute__((__packed__))
 
-#include "utils/dl_crc32.h"
+    typedef bool bool_t;
+    typedef char char_t;
 
-#include "config_app.h"
+    typedef enum
+    {
+        RESULT_OK = 0,
+        RESULT_ERR,
+        RESULT_BUSY,
+        RESULT_INCOMPLETE,
+    } result_t;
 
-#ifdef __cplusplus
-}
-#endif
+    #define UNUSED(X) (void)X      /* To avoid gcc/g++ warnings */
 
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* DYGMA_CORE_TYPES_SPECIFIED */
+
+#endif /* __DL_TYPES_H_ */

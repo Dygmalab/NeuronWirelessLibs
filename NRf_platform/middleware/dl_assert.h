@@ -26,24 +26,29 @@
 #ifndef __DL_ASSERT_H_
 #define __DL_ASSERT_H_
 
-#include "types.h"
+#include "dl_types.h"
 
-#ifndef DEBUG
-#define STOP_IF_ERR( err, msg )
-#define ASSERT_DYGMA( cond, msg )
-#else
-#define STOP_IF_ERR( err, msg ) if ( ( err ) == RESULT_ERR ) for ( ; ; );
-//#define ASSERT_DYGMA( cond, msg ) if ( !( cond ) ) for ( ; ; );
-#define ASSERT_DYGMA( cond, msg ) if ( !( cond ) )                                \
-                                  {                                               \
-                                      debug_error( __FILE__, __LINE__, msg );     \
-                                      for ( ; ; );                                \
-                                  }
-#endif
+/*
+ * DO NOT MODIFY!!!
+ *
+ * The Dygma core is used among various Dygma frameworks to assure the same coding philosophy
+ * and prevent conflicts when used together in a project.
+ */
+#ifndef DYGMA_CORE_ASSERT_SPECIFIED
+#define DYGMA_CORE_ASSERT_SPECIFIED
 
-#define EXIT_IF_ERR( err, msg ) if ( ( err ) == RESULT_ERR ) goto _EXIT;
-//#define EXIT_IF_ERR( err, msg ) if ( ( err ) == RESULT_ERR ){ DEBUG_PRINTF(msg); DEBUG_PRINTF("\r\n"); goto _EXIT; }
-#define EXIT_IF_OK( res )       if ( ( res ) == RESULT_OK ) goto _EXIT;
-#define EXIT_IF_NOK( res )      if ( ( res ) != RESULT_OK ) goto _EXIT;
+    #ifndef DEBUG
+    #define STOP_IF_ERR( err, msg )
+    #define ASSERT_DYGMA( cond, msg )
+    #else
+    #define STOP_IF_ERR( err, msg ) if ( ( err ) == RESULT_ERR ) for ( ; ; );
+    #define ASSERT_DYGMA( cond, msg ) if ( !( cond ) ) for ( ; ; );
+    #endif
+
+    #define EXIT_IF_ERR( err, msg ) if ( ( err ) == RESULT_ERR ) goto _EXIT;
+    #define EXIT_IF_OK( res )       if ( ( res ) == RESULT_OK ) goto _EXIT;
+    #define EXIT_IF_NOK( res )      if ( ( res ) != RESULT_OK ) goto _EXIT;
+
+#endif /* DYGMA_CORE_ASSERT_SPECIFIED */
 
 #endif /* __DL_ASSERT_H_ */
