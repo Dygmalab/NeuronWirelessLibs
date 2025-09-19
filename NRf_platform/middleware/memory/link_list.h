@@ -1,8 +1,7 @@
-
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,26 +22,29 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __LINK_LIST_H_
+#define __LINK_LIST_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "dl_types.h"
-#include "dl_assert.h"
+#include "dl_middleware.h"
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/utils.h"
+typedef struct linklist linklist_t;
 
-#include "utils/dl_crc32.h"
+extern result_t linklist_init( linklist_t ** pp_linklist );
 
-#include "config_app.h"
+extern result_t linklist_add( linklist_t * p_linklist, void * p_instance );
+extern void * linklist_get( linklist_t * p_linklist );                       /* Returns currently navigated p_instance previously
+                                                                                added to the list with linklist_add */
+extern void linklist_nav_head( linklist_t * p_linklist );
+extern void linklist_nav_tail( linklist_t * p_linklist );
+extern void linklist_nav_next( linklist_t * p_linklist );
+extern void linklist_nav_prev( linklist_t * p_linklist );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* __LINK_LIST_H_ */
