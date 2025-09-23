@@ -46,7 +46,7 @@ namespace plugin
 Do_once clear_pin_digits_count;
 
 
-void BleManager::init(void)
+void BleManager::enable(void)
 {
     TinyUSBDevice.detach();
 

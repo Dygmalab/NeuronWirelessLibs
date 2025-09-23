@@ -117,7 +117,7 @@ class BleManager : public Plugin
     EventHandlerResult onKeyswitchEvent(Key &mapped_Key, KeyAddr key_addr, uint8_t key_state);
     EventHandlerResult onFocusEvent(const char *command);
 
-    void init(void);
+    void enable(void);
     bool getForceBle(void);
     void setForceBle(bool enabled);
     void set_bt_name_from_specifications(const char *spec);
