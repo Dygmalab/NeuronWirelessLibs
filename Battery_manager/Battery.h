@@ -24,16 +24,23 @@
 #include <Kaleidoscope-Ranges.h>
 #include <Arduino.h>
 
+#include "kbd_if.h"
+
 namespace kaleidoscope {
 namespace plugin {
 class Battery : public Plugin {
    public:
-    EventHandlerResult onSetup();
     EventHandlerResult onFocusEvent(const char *command);
-    EventHandlerResult onKeyswitchEvent(Key &mapped_Key, KeyAddr key_addr, uint8_t key_state);
 
+    result_t init( void );
+
+   public:
     static uint8_t get_battery_status_left(void);
     static uint8_t get_battery_status_right(void);
+
+   private:
+    kbdif_t * p_kbdif = NULL;
+    result_t kbdif_initialize(void);
 
    private:
     static uint8_t battery_level;
@@ -43,6 +50,10 @@ class Battery : public Plugin {
     static uint8_t status_right;
     static uint8_t battery_level_left;
     static uint8_t battery_level_right;
+
+    static const kbdif_handlers_t kbdif_handlers;
+
+    static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
 };
 
 }  // namespace plugin

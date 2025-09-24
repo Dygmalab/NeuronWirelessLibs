@@ -26,6 +26,8 @@
 #include "kaleidoscope/plugin/LEDControlDefy.h"
 #include "FirmwareVersion.h"
 
+#include "kbd_if_manager.h"
+
 
 #define NOT_CHARGING 0
 
@@ -46,31 +48,6 @@ uint8_t Battery::status_left = 4;
 uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
-
-
-EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
-{
-    if (mappedKey.getRaw() != ranges::BATTERY_LEVEL )
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (keyToggledOn(keyState) &&  FirmwareVersion::keyboard_is_wireless())
-    {
-        ::LEDControl.set_mode(9);
-        ::LEDControl.set_force_mode(true);
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
-    }
-
-    if (keyToggledOff(keyState))
-    {
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
-        ::LEDControl.set_force_mode(false);
-        ::LEDControl.set_mode(0);
-    }
-
-    return EventHandlerResult::EVENT_CONSUMED;
-}
 
 EventHandlerResult Battery::onFocusEvent(const char *command)
 {
@@ -175,8 +152,34 @@ bool inline filterHand(Communications_protocol::Devices incomingDevice, bool rig
     }
 }
 
-EventHandlerResult Battery::onSetup()
+result_t Battery::kbdif_initialize()
 {
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = this;
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
+}
+
+result_t Battery::init()
+{
+    result_t result = RESULT_ERR;
+
+    result = kbdif_initialize();
+    EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
     // Save saving_mode variable in EEPROM
     settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(saving_mode));
     uint8_t saving;
@@ -251,7 +254,8 @@ EventHandlerResult Battery::onSetup()
         Communications.sendPacket(packet);
     }));
 
-    return EventHandlerResult::OK;
+_EXIT:
+    return result;
 }
 
 uint8_t Battery::get_battery_status_left(void)
@@ -275,6 +279,35 @@ uint8_t Battery::get_battery_status_right(void)
 
     return status_right;
 }
+
+kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key )
+{
+    if ( p_key->type != KBDAPI_KEY_TYPE_BATTERY_LEVEL )
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
+    {
+        ::LEDControl.set_mode(9);
+        ::LEDControl.set_force_mode(true);
+        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
+    }
+
+    if ( p_key->toggled_off == true )
+    {
+        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
+        ::LEDControl.set_force_mode(false);
+        ::LEDControl.set_mode(0);
+    }
+
+    return KBDAPI_EVENT_RESULT_CONSUMED;
+}
+
+const kbdif_handlers_t Battery::kbdif_handlers =
+{
+    .key_event_cb = kbdif_key_event_cb,
+};
 
 } // namespace plugin
 } //  namespace kaleidoscope
