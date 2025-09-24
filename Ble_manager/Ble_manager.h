@@ -28,6 +28,7 @@
 #include <Kaleidoscope-EEPROM-Settings.h>
 #include <Kaleidoscope-Ranges.h>
 
+#include "kbd_if.h"
 
 namespace kaleidoscope
 {
@@ -111,11 +112,11 @@ class BleManager : public Plugin
   public:
     bool trigger_save_name_timer = false;
 
-    EventHandlerResult onSetup();
     EventHandlerResult beforeEachCycle();
     EventHandlerResult beforeReportingState();
-    EventHandlerResult onKeyswitchEvent(Key &mapped_Key, KeyAddr key_addr, uint8_t key_state);
     EventHandlerResult onFocusEvent(const char *command);
+
+    result_t init( void );
 
     void enable(void);
     bool getForceBle(void);
@@ -179,6 +180,11 @@ class BleManager : public Plugin
     bool timer_save_name_start_count = false;
     uint32_t ti_save_new_name = 0;
 
+    kbdif_t * p_kbdif = NULL;
+
+    result_t kbdif_initialize(void);
+    kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
+
     void timer_save_conn_run(uint32_t timeout_ms);
     void save_connection(void);
 
@@ -187,16 +193,21 @@ class BleManager : public Plugin
 
     void set_paired_channel_led(uint8_t channel, bool turnOn);
 
-    void set_channel_in_use(KeyAddr channel_in_use_);
+    void set_channel_in_use( kbdapi_key_t * p_key_);
     void erase_paired_device(uint8_t index_channel);
-    bool is_num_key(uint16_t raw_key);
-    char raw_key_to_ascii(uint16_t raw_key);
+    bool is_num_key(kbdapi_key_t * p_key);
+    char raw_key_to_ascii(kbdapi_key_t * p_key);
     void update_channel_and_name(void);
     /*
      * Disables the advertising LED effect.
      * This method disables the breathe effect.
      */
     void exit_pairing_mode(void);
+
+  private:
+    static const kbdif_handlers_t kbdif_handlers;
+
+    static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
 };
 
 } // namespace plugin

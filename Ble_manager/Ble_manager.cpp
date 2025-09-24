@@ -30,6 +30,7 @@
 #include "FirmwareVersion.h"
 
 #include "Do_once.h"
+#include "kbd_if_manager.h"
 
 
 void device_name_evt_handler(void);
@@ -45,6 +46,92 @@ namespace plugin
 
 Do_once clear_pin_digits_count;
 
+result_t BleManager::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = this;
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
+}
+
+result_t BleManager::init()
+{
+    result_t result = RESULT_ERR;
+    uint8_t i;
+
+    result = kbdif_initialize();
+    EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
+    flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
+
+    Runtime.storage().get(flash_base_addr, ble_flash_data);
+    // For now lest think that if this variable is invalid, restart everything.
+    if (ble_flash_data.currentChannel == 0xFF)
+    {
+        ble_flash_data.reset();
+
+        // Save it in flash memory.
+        Runtime.storage().put(flash_base_addr, ble_flash_data);
+        Runtime.storage().commit();
+    }
+
+#if BLE_MANAGER_DEBUG_LOG
+    NRF_LOG_DEBUG("Ble_manager: Current channel %i", ble_flash_data.currentChannel);
+#endif
+
+    Runtime.storage().get(flash_base_addr, ble_flash_data);
+    update_channel_and_name();
+    // UX STUFFf
+    i = 0;
+    for (auto &item : ble_flash_data.ble_connections) // get all the paired devices and store in a variable.
+    {
+        if (item.get_peer_id() == PM_PEER_ID_INVALID)
+        {
+            set_paired_channel_led(i, false); // set channel related bit to 0
+
+#if BLE_MANAGER_DEBUG_LOG
+            NRF_LOG_DEBUG("Ble_manager: Channel %i -> 0", i);
+#endif
+        }
+        else
+        {
+            set_paired_channel_led(i, true); // set channel related bit to 1
+
+#if BLE_MANAGER_DEBUG_LOG
+            NRF_LOG_DEBUG("Ble_manager: Channel %i -> 1", i);
+#endif
+        }
+
+        i++;
+    }
+
+#if BLE_MANAGER_DEBUG_LOG
+    NRF_LOG_DEBUG("Ble_manager: %i channels in total.", i);
+#endif
+
+    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+    ledBluetoothPairingDefy.setEreaseDone(false);
+
+#if BLE_MANAGER_DEBUG_LOG
+    NRF_LOG_FLUSH();
+#endif
+
+_EXIT:
+    return result;
+}
 
 void BleManager::enable(void)
 {
@@ -122,65 +209,6 @@ void BleManager::enable(void)
             Runtime.storage().commit();
         }
     }
-}
-
-EventHandlerResult BleManager::onSetup(void)
-{
-    flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
-
-    Runtime.storage().get(flash_base_addr, ble_flash_data);
-    // For now lest think that if this variable is invalid, restart everything.
-    if (ble_flash_data.currentChannel == 0xFF)
-    {
-        ble_flash_data.reset();
-
-        // Save it in flash memory.
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
-    }
-
-#if BLE_MANAGER_DEBUG_LOG
-    NRF_LOG_DEBUG("Ble_manager: Current channel %i", ble_flash_data.currentChannel);
-#endif
-
-    Runtime.storage().get(flash_base_addr, ble_flash_data);
-    update_channel_and_name();
-    // UX STUFFf
-    uint8_t i = 0;
-    for (auto &item : ble_flash_data.ble_connections) // get all the paired devices and store in a variable.
-    {
-        if (item.get_peer_id() == PM_PEER_ID_INVALID)
-        {
-            set_paired_channel_led(i, false); // set channel related bit to 0
-
-#if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_DEBUG("Ble_manager: Channel %i -> 0", i);
-#endif
-        }
-        else
-        {
-            set_paired_channel_led(i, true); // set channel related bit to 1
-
-#if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_DEBUG("Ble_manager: Channel %i -> 1", i);
-#endif
-        }
-
-        i++;
-    }
-
-#if BLE_MANAGER_DEBUG_LOG
-    NRF_LOG_DEBUG("Ble_manager: %i channels in total.", i);
-#endif
-
-    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-    ledBluetoothPairingDefy.setEreaseDone(false);
-
-#if BLE_MANAGER_DEBUG_LOG
-    NRF_LOG_FLUSH();
-#endif
-
-    return EventHandlerResult::OK;
 }
 
 void BleManager::update_channel_and_name(void)
@@ -462,258 +490,21 @@ bool BleManager::get_pairing_key_press(void)
     return pairing_key_press;
 }
 
-EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
-{
-    /* Exit conditions. */
-    if (!ble_innited())
-    {
-        if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOn(keyState) && FirmwareVersion::keyboard_is_wireless())
-        {
-            auto const &keyScanner = Runtime.device().keyScanner();
-            auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
-            auto isDefyRightWired = keyScanner.rightSideWiredConnection();
-            auto isWiredMode = isDefyLeftWired || isDefyRightWired;
-
-            if (isWiredMode)
-            {
-                ble_flash_data.forceBle = true;
-
-                // Save it in flash memory.
-                Runtime.storage().put(flash_base_addr, ble_flash_data);
-                Runtime.storage().commit();
-
-                set_pairing_key_press(true);
-
-                reset_mcu();
-
-            }
-        }
-        else
-        {
-            return EventHandlerResult::OK;
-        }
-    }
-
-    if (keyToggledOff(keyState) && mitm_activated && is_num_key(mappedKey.getRaw()))
-    {
-        static uint8_t pin_digits_count = 0;
-
-        encryption_pin_number[pin_digits_count] = raw_key_to_ascii(mappedKey.getRaw());
-
-#if BLE_MANAGER_DEBUG_LOG
-        NRF_LOG_DEBUG("Ble_manager: encryption_pin_number[%d] = %c",
-                      pin_digits_count,
-                      encryption_pin_number[pin_digits_count]);
-        NRF_LOG_FLUSH();
-#endif
-
-        pin_digits_count++;
-
-        if (pin_digits_count == 6) // PIN numbers has 6 digits.
-        {
-#if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_DEBUG("Ble_manager: Sending pin number..");
-            NRF_LOG_FLUSH();
-#endif
-
-            pin_digits_count = 0;
-            ble_send_encryption_pin(encryption_pin_number);
-            mitm_activated = false;
-
-            clear_pin_digits_count.reset();
-        }
-        else if (get_flag_security_proc_failed() &&
-                clear_pin_digits_count.do_once())
-        {
-            pin_digits_count = 0;
-        }
-
-        return EventHandlerResult::EVENT_CONSUMED;
-    }
-
-    if (!ble_is_advertising_mode() && show_bt_layer && mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOff(keyState))
-    {
-        exit_pairing_mode();
-
-        return EventHandlerResult::EVENT_CONSUMED;
-    }
-
-    if (mappedKey.getRaw() == ranges::BLUETOOTH_PAIRING && keyToggledOff(keyState))
-    {
-
-        send_led_mode();
-        show_bt_layer = true;
-
-        return EventHandlerResult::EVENT_CONSUMED;
-    }
-
-    EventHandlerResult result = EventHandlerResult::OK;
-    
-    if (ble_is_idle())
-    {
-        ble_goto_advertising_mode();
-        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
-        send_led_mode();
-        LEDControl::enable();
-    }
-
-    if (show_bt_layer)
-    {
-        if (((key_addr.col() == 0 && key_addr.row() == 0) || (key_addr.col() == 9 && key_addr.row() == 0)) && keyToggledOn(keyState))
-        {
-            reset_mcu();
-        }
-
-        /* Erease previous paired channels*/
-        if (((key_addr.col() == 1 && key_addr.row() == 1) ||  // Q key
-             (key_addr.col() == 2 && key_addr.row() == 1) ||  // W key
-             (key_addr.col() == 3 && key_addr.row() == 1) ||  // E key
-             (key_addr.col() == 4 && key_addr.row() == 1) ||  // R key
-             (key_addr.col() == 5 && key_addr.row() == 1) ||  // T key
-             (key_addr.col() == 10 && key_addr.row() == 1) || // Y key
-             (key_addr.col() == 11 && key_addr.row() == 1) || // U key
-             (key_addr.col() == 12 && key_addr.row() == 1) || // I key
-             (key_addr.col() == 13 && key_addr.row() == 1) || // O key
-             (key_addr.col() == 14 && key_addr.row() == 1))   // PT key
-            && keyIsPressed(keyState))
-        {
-            set_channel_in_use(key_addr);
-            uint8_t index_channel = channel_in_use;
-            if (keyToggledOn(keyState))
-            {
-                connectionState[index_channel].timePressed = millis();
-            }
-
-            if (keyIsPressed(keyState) && millis() - connectionState[index_channel].timePressed >= 3000)
-            {
-                // TODO: create a led effect to let the user know that the erease was successful
-                erase_paired_device(index_channel);
-
-                result = EventHandlerResult::EVENT_CONSUMED;
-            }
-
-            if (keyToggledOff(keyState))
-            {
-                connectionState[index_channel].timePressed = 0;
-                connectionState[index_channel].longPress = false;
-            }
-        }
-
-        /*Change channel in use*/
-        if (((key_addr.col() == 1 && key_addr.row() == 0) ||                                                  // 1 key
-             (key_addr.col() == 2 && key_addr.row() == 0) ||                                                  // 2 key
-             (key_addr.col() == 3 && key_addr.row() == 0) ||                                                  // 3 key
-             (key_addr.col() == 4 && key_addr.row() == 0) ||                                                  // 4 key
-             (key_addr.col() == 5 && key_addr.row() == 0) || (key_addr.col() == 10 && key_addr.row() == 0) || // 6 key
-             (key_addr.col() == 11 && key_addr.row() == 0) ||                                                 // 7 key
-             (key_addr.col() == 12 && key_addr.row() == 0) ||                                                 // 8 key
-             (key_addr.col() == 13 && key_addr.row() == 0) ||                                                 // 9 key
-             (key_addr.col() == 14 && key_addr.row() == 0))                                                   // 0 key
-            && keyWasPressed(keyState))
-        {
-            set_channel_in_use(key_addr);
-
-#if BLE_MANAGER_DEBUG_LOG
-            //NRF_LOG_DEBUG("Ble_manager: channel_in_use: %i", channel_in_use);
-#endif
-
-            uint8_t index_channel = channel_in_use;
-            // Only if the key has not been press for longer than 2 seconds then change the gapAddress
-            if (keyToggledOff(keyState))
-            {
-                // NRF_LOG_DEBUG(" ble_is_advertising_mode(): %i", ble_is_advertising_mode());
-                if (ble_flash_data.currentChannel != index_channel)
-                {
-#if BLE_MANAGER_DEBUG_LOG
-                    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", ble_flash_data.currentChannel, index_channel);
-#endif
-
-                    ble_flash_data.currentChannel = index_channel;
-                    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-                    ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
-                    send_led_mode();
-                    update_channel_and_name();
-
-                    // First we disable scanning and advertising.
-                    ble_adv_stop();
-                    delay(200);
-                    
-                    // Save it in flash memory.
-                    Runtime.storage().put(flash_base_addr, ble_flash_data);
-                    Runtime.storage().commit();
-                    /*
-                        In this case, the data need to be saved instantly and not when
-                        run_update_periodically() is executed.
-                    */
-                    EEPROM.update();
-
-                    update_current_channel();
-                    delay(200);
-
-                    // Try to change the channel.
-                    ble_disconnect();
-                    delay(200);
-
-                    // Try to reconnect again.
-                    gap_params_init();
-                    delay(200);
-
-                    ble_adv_stop();
-                    advertising_init();
-                    delay(200);
-
-                    /*
-                        If it doesn't have any device paired on the channel, it goes into
-                        advertising with a whitelist so that any device can find it.
-                    */
-                    pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
-                    if (active_connection_peer_id == PM_PEER_ID_INVALID)
-                    {
-#if BLE_MANAGER_DEBUG_LOG
-                        NRF_LOG_INFO("Ble_manager: Whitelist deactivated.");
-#endif
-                        ble_goto_advertising_mode();
-                    }
-                    else
-                    {
-#if BLE_MANAGER_DEBUG_LOG
-                        NRF_LOG_INFO("Ble_manager: Whitelist activated.");
-#endif
-                        ble_goto_white_list_advertising_mode();
-                    }
-
-                    result = EventHandlerResult::EVENT_CONSUMED;
-                }
-                else if (ble_flash_data.currentChannel == index_channel && !ble_is_advertising_mode())
-                {
-                    exit_pairing_mode();
-                }
-            }
-
-#if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_FLUSH();
-#endif
-        }
-    }
-
-    return result;
-}
-
-bool BleManager::is_num_key(uint16_t raw_key)
+bool BleManager::is_num_key( kbdapi_key_t * p_key )
 {
     /*
-        #define HID_KEYBOARD_1_AND_EXCLAMATION_POINT	0x1E	// Sel
-        #define HID_KEYBOARD_2_AND_AT			0x1F	// Sel
-        #define HID_KEYBOARD_3_AND_POUND		0x20	// Sel
-        #define HID_KEYBOARD_4_AND_DOLLAR		0x21	// Sel
-        #define HID_KEYBOARD_5_AND_PERCENT		0x22	// Sel
-        #define HID_KEYBOARD_6_AND_CARAT		0x23	// Sel
-        #define HID_KEYBOARD_7_AND_AMPERSAND		0x24	// Sel
-        #define HID_KEYBOARD_8_AND_ASTERISK		0x25	// Sel
-        #define HID_KEYBOARD_9_AND_LEFT_PAREN		0x26	// Sel
-        #define HID_KEYBOARD_0_AND_RIGHT_PAREN		0x27	// Sel
+     *  KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT,
+     *  KBDAPI_KEY_TYPE_KBD_2_AND_AT,
+     *  KBDAPI_KEY_TYPE_KBD_3_AND_POUND,
+     *  KBDAPI_KEY_TYPE_KBD_4_AND_DOLLAR,
+     *  KBDAPI_KEY_TYPE_KBD_5_AND_PERCENT,
+     *  KBDAPI_KEY_TYPE_KBD_6_AND_CARAT,
+     *  KBDAPI_KEY_TYPE_KBD_7_AND_AMPERSAND,
+     *  KBDAPI_KEY_TYPE_KBD_8_AND_ASTERISK,
+     *  KBDAPI_KEY_TYPE_KBD_9_AND_LEFT_PAREN,
+     *  KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN,
     */
-    if ((raw_key >= HID_KEYBOARD_1_AND_EXCLAMATION_POINT) && (raw_key <= HID_KEYBOARD_0_AND_RIGHT_PAREN))
+    if (( p_key->type >= KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT) && (p_key->type <= KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN))
     {
         return true;
     }
@@ -721,9 +512,9 @@ bool BleManager::is_num_key(uint16_t raw_key)
     return false;
 }
 
-char BleManager::raw_key_to_ascii(uint16_t raw_key)
+char BleManager::raw_key_to_ascii( kbdapi_key_t * p_key )
 {
-    uint8_t num = raw_key - HID_KEYBOARD_1_AND_EXCLAMATION_POINT + 1;
+    uint8_t num = p_key->type - KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT + 1;
 
     if (num != 10)
     {
@@ -819,7 +610,7 @@ void BleManager::send_led_mode(void)
                                          false);
 }
 
-void BleManager::set_channel_in_use(KeyAddr key_addr)
+void BleManager::set_channel_in_use( kbdapi_key_t * p_key )
 {
     const int colMapping[5][2] =
     {
@@ -832,8 +623,8 @@ void BleManager::set_channel_in_use(KeyAddr key_addr)
 
     for (int i = 0; i < 5; i++)
     {
-        if ( (key_addr.col() == colMapping[i][0] || key_addr.col() == colMapping[i][1]) &&
-            (key_addr.row() == 0 || key_addr.row() == 1) )
+        if ( (p_key->col == colMapping[i][0] || p_key->col == colMapping[i][1]) &&
+            (p_key->row == 0 || p_key->row == 1) )
         {
             channel_in_use = static_cast<Channels>(i);
 
@@ -934,6 +725,255 @@ EventHandlerResult BleManager::beforeReportingState(void)
 
     return EventHandlerResult::OK;
 }
+
+kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
+{
+    /* Exit conditions. */
+    if (!ble_innited())
+    {
+        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && FirmwareVersion::keyboard_is_wireless())
+        {
+            auto const &keyScanner = Runtime.device().keyScanner();
+            auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
+            auto isDefyRightWired = keyScanner.rightSideWiredConnection();
+            auto isWiredMode = isDefyLeftWired || isDefyRightWired;
+
+            if (isWiredMode)
+            {
+                ble_flash_data.forceBle = true;
+
+                // Save it in flash memory.
+                Runtime.storage().put(flash_base_addr, ble_flash_data);
+                Runtime.storage().commit();
+
+                set_pairing_key_press(true);
+
+                reset_mcu();
+
+            }
+        }
+        else
+        {
+            return KBDAPI_EVENT_RESULT_IGNORED;
+        }
+    }
+
+    if ( p_key->toggled_off && mitm_activated && is_num_key( p_key ))
+    {
+        static uint8_t pin_digits_count = 0;
+
+        encryption_pin_number[pin_digits_count] = raw_key_to_ascii(p_key);
+
+#if BLE_MANAGER_DEBUG_LOG
+        NRF_LOG_DEBUG("Ble_manager: encryption_pin_number[%d] = %c",
+                      pin_digits_count,
+                      encryption_pin_number[pin_digits_count]);
+        NRF_LOG_FLUSH();
+#endif
+
+        pin_digits_count++;
+
+        if (pin_digits_count == 6) // PIN numbers has 6 digits.
+        {
+#if BLE_MANAGER_DEBUG_LOG
+            NRF_LOG_DEBUG("Ble_manager: Sending pin number..");
+            NRF_LOG_FLUSH();
+#endif
+
+            pin_digits_count = 0;
+            ble_send_encryption_pin(encryption_pin_number);
+            mitm_activated = false;
+
+            clear_pin_digits_count.reset();
+        }
+        else if (get_flag_security_proc_failed() &&
+                clear_pin_digits_count.do_once())
+        {
+            pin_digits_count = 0;
+        }
+
+        return KBDAPI_EVENT_RESULT_CONSUMED;
+    }
+
+    if ( !ble_is_advertising_mode() && show_bt_layer && p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
+    {
+        exit_pairing_mode();
+
+        return KBDAPI_EVENT_RESULT_CONSUMED;
+    }
+
+    if ( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
+    {
+        send_led_mode();
+        show_bt_layer = true;
+
+        return KBDAPI_EVENT_RESULT_CONSUMED;
+    }
+
+    kbdapi_event_result_t result = KBDAPI_EVENT_RESULT_IGNORED;
+
+    if (ble_is_idle())
+    {
+        ble_goto_advertising_mode();
+        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        send_led_mode();
+        LEDControl::enable();
+    }
+
+    if (show_bt_layer)
+    {
+        if (((p_key->col == 0 && p_key->row == 0) || (p_key->col == 9 && p_key->row == 0)) && p_key->toggled_on)
+        {
+            reset_mcu();
+        }
+
+        /* Erease previous paired channels*/
+        if (((p_key->col == 1 && p_key->row == 1) ||  // Q key
+             (p_key->col == 2 && p_key->row == 1) ||  // W key
+             (p_key->col == 3 && p_key->row == 1) ||  // E key
+             (p_key->col == 4 && p_key->row == 1) ||  // R key
+             (p_key->col == 5 && p_key->row == 1) ||  // T key
+             (p_key->col == 10 && p_key->row == 1) || // Y key
+             (p_key->col == 11 && p_key->row == 1) || // U key
+             (p_key->col == 12 && p_key->row == 1) || // I key
+             (p_key->col == 13 && p_key->row == 1) || // O key
+             (p_key->col == 14 && p_key->row == 1))   // PT key
+            && p_key->is_pressed)
+        {
+            set_channel_in_use( p_key );
+            uint8_t index_channel = channel_in_use;
+            if ( p_key->toggled_on )
+            {
+                connectionState[index_channel].timePressed = millis();
+            }
+
+            if ( p_key->is_pressed && millis() - connectionState[index_channel].timePressed >= 3000)
+            {
+                // TODO: create a led effect to let the user know that the erease was successful
+                erase_paired_device(index_channel);
+
+                result = KBDAPI_EVENT_RESULT_CONSUMED;
+            }
+
+#warning "Check if this actually works as this space is iffed with 'p_key->is_pressed'"
+            if ( p_key->toggled_off )
+            {
+                connectionState[index_channel].timePressed = 0;
+                connectionState[index_channel].longPress = false;
+            }
+        }
+
+        /*Change channel in use*/
+        if (((p_key->col == 1 && p_key->row == 0) ||                                                  // 1 key
+             (p_key->col == 2 && p_key->row == 0) ||                                                  // 2 key
+             (p_key->col == 3 && p_key->row == 0) ||                                                  // 3 key
+             (p_key->col == 4 && p_key->row == 0) ||                                                  // 4 key
+             (p_key->col == 5 && p_key->row == 0) || (p_key->col == 10 && p_key->row == 0) || // 6 key
+             (p_key->col == 11 && p_key->row == 0) ||                                                 // 7 key
+             (p_key->col == 12 && p_key->row == 0) ||                                                 // 8 key
+             (p_key->col == 13 && p_key->row == 0) ||                                                 // 9 key
+             (p_key->col == 14 && p_key->row == 0))                                                   // 0 key
+            && p_key->was_pressed)
+        {
+            set_channel_in_use( p_key );
+
+#if BLE_MANAGER_DEBUG_LOG
+            //NRF_LOG_DEBUG("Ble_manager: channel_in_use: %i", channel_in_use);
+#endif
+
+            uint8_t index_channel = channel_in_use;
+            // Only if the key has not been press for longer than 2 seconds then change the gapAddress
+            if ( p_key->toggled_off )
+            {
+                // NRF_LOG_DEBUG(" ble_is_advertising_mode(): %i", ble_is_advertising_mode());
+                if (ble_flash_data.currentChannel != index_channel)
+                {
+#if BLE_MANAGER_DEBUG_LOG
+                    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", ble_flash_data.currentChannel, index_channel);
+#endif
+
+                    ble_flash_data.currentChannel = index_channel;
+                    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+                    ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+                    send_led_mode();
+                    update_channel_and_name();
+
+                    // First we disable scanning and advertising.
+                    ble_adv_stop();
+                    delay(200);
+
+                    // Save it in flash memory.
+                    Runtime.storage().put(flash_base_addr, ble_flash_data);
+                    Runtime.storage().commit();
+                    /*
+                        In this case, the data need to be saved instantly and not when
+                        run_update_periodically() is executed.
+                    */
+                    EEPROM.update();
+
+                    update_current_channel();
+                    delay(200);
+
+                    // Try to change the channel.
+                    ble_disconnect();
+                    delay(200);
+
+                    // Try to reconnect again.
+                    gap_params_init();
+                    delay(200);
+
+                    ble_adv_stop();
+                    advertising_init();
+                    delay(200);
+
+                    /*
+                        If it doesn't have any device paired on the channel, it goes into
+                        advertising with a whitelist so that any device can find it.
+                    */
+                    pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
+                    if (active_connection_peer_id == PM_PEER_ID_INVALID)
+                    {
+#if BLE_MANAGER_DEBUG_LOG
+                        NRF_LOG_INFO("Ble_manager: Whitelist deactivated.");
+#endif
+                        ble_goto_advertising_mode();
+                    }
+                    else
+                    {
+#if BLE_MANAGER_DEBUG_LOG
+                        NRF_LOG_INFO("Ble_manager: Whitelist activated.");
+#endif
+                        ble_goto_white_list_advertising_mode();
+                    }
+
+                    result = KBDAPI_EVENT_RESULT_CONSUMED;
+                }
+                else if (ble_flash_data.currentChannel == index_channel && !ble_is_advertising_mode())
+                {
+                    exit_pairing_mode();
+                }
+            }
+
+#if BLE_MANAGER_DEBUG_LOG
+            NRF_LOG_FLUSH();
+#endif
+        }
+    }
+
+    return result;
+}
+
+kbdapi_event_result_t BleManager::kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key )
+{
+    BleManager * p_BleManager = ( BleManager *)p_instance;
+
+    return p_BleManager->kbdif_key_event_process( p_key );
+}
+
+const kbdif_handlers_t BleManager::kbdif_handlers =
+{
+    .key_event_cb = kbdif_key_event_cb,
+};
 
 } // namespace plugin
 } //  namespace kaleidoscope
