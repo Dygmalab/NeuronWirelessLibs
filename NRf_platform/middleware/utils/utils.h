@@ -28,8 +28,13 @@
 
 #include "dl_middleware.h"
 
+#ifndef DYGMA_CORE_UTILS_SPECIFIED
+#define DYGMA_CORE_UTILS_SPECIFIED
+
 #define _get_def( def, _defs, _def_type, _id, id ) { def = NULL; \
     for ( size_t index = 0; index < sizeof( _defs ) / sizeof( _def_type ); ++index ) \
     if ( _defs[ index ]._id == id ) { def = &_defs[ index ]; break; } }
+
+#endif /* DYGMA_CORE_UTILS_SPECIFIED */
 
 #endif /* __UTILS_H_ */
