@@ -716,16 +716,6 @@ EventHandlerResult BleManager::onFocusEvent(const char *command)
     return EventHandlerResult::OK;
 }
 
-EventHandlerResult BleManager::beforeReportingState(void)
-{
-    if (show_bt_layer)
-    {
-        Runtime.device().hid().keyboard().releaseAllKeys();
-    }
-
-    return EventHandlerResult::OK;
-}
-
 kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
 {
     /* Exit conditions. */

@@ -113,7 +113,6 @@ class BleManager : public Plugin
     bool trigger_save_name_timer = false;
 
     EventHandlerResult beforeEachCycle();
-    EventHandlerResult beforeReportingState();
     EventHandlerResult onFocusEvent(const char *command);
 
     result_t init( void );
