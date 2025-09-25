@@ -112,8 +112,6 @@ class BleManager : public Plugin
   public:
     bool trigger_save_name_timer = false;
 
-    EventHandlerResult beforeEachCycle();
-
     result_t init( void );
 
     void enable(void);
@@ -125,6 +123,9 @@ class BleManager : public Plugin
     bool get_pairing_key_press(void);
 
     void send_led_mode(void);
+
+    void run();
+
   private:
 
     bool pairing_key_press = false;

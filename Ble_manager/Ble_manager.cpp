@@ -249,91 +249,6 @@ void BleManager::update_channel_and_name(void)
     }
 }
 
-EventHandlerResult BleManager::beforeEachCycle(void)
-{
-    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
-    {
-        return EventHandlerResult::OK;
-    }
-
-    timer_save_conn_run(2000);  // 2000ms timer.
-    timer_save_name_run(2000);  // 2000ms timer.
-
-    if (get_flag_security_proc_started())
-    {
-        mitm_activated = true;
-        exit_pairing_mode(); // If it is in the "enter pin number" state, set default layer.
-        clear_flag_security_proc_started();
-    }
-    else if (get_flag_security_proc_failed())
-    {
-        mitm_activated = false;
-        send_led_mode(); // If enters pin number fails, returns to advertising led mode layer.
-        show_bt_layer = true;
-        clear_flag_security_proc_failed();
-    }
-
-    if (mitm_activated && ble_connected())
-    {
-        mitm_activated = false;
-    }
-
-    // Gives time to the EPPROM to update
-    static bool activated_advertising = false;
-
-    if (ble_is_advertising_mode())
-    {
-        // Just activate once.
-        if (!activated_advertising )
-        {
-            // set_pairing_led_effect();
-
-#if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_DEBUG("Ble_manager: Channel %i, advertising mode.", ble_flash_data.currentChannel);
-            NRF_LOG_FLUSH();
-#endif
-
-            ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
-            show_bt_layer = true;
-            send_led_mode();
-            activated_advertising = true;
-        }
-    }
-    else if( ble_connected() )
-    {
-        if ( activated_advertising )
-        {
-            ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
-            ledBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
-            set_paired_channel_led(ble_flash_data.currentChannel, true);
-            send_led_mode();
-            ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
-            activated_advertising = false;
-            exit_pairing_mode();
-
-            trigger_save_conn_timer = true;
-        }
-    }
-    else if (activated_advertising && ble_is_idle())
-    {
-        activated_advertising = false;
-        LEDControl::disable();
-        Communications_protocol::Packet p{};
-        p.header.command = Communications_protocol::SLEEP;
-        Communications.sendPacket(p);
-    }
-
-    // Reconection of side
-    if (!activated_advertising && ble_is_idle() && LEDControl::isEnabled())
-    {
-        ble_goto_advertising_mode();
-        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
-        send_led_mode();
-    }
-
-    return EventHandlerResult::OK;
-}
-
 void BleManager::timer_save_conn_run(uint32_t timeout_ms)
 {
     /*
@@ -650,6 +565,89 @@ void BleManager::setForceBle(bool enabled)
 void BleManager::set_bt_name_from_specifications(const char *spec)
 {
     ble_device_name = spec;
+}
+
+void BleManager::run()
+{
+    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
+    {
+        return;
+    }
+
+    timer_save_conn_run(2000);  // 2000ms timer.
+    timer_save_name_run(2000);  // 2000ms timer.
+
+    if (get_flag_security_proc_started())
+    {
+        mitm_activated = true;
+        exit_pairing_mode(); // If it is in the "enter pin number" state, set default layer.
+        clear_flag_security_proc_started();
+    }
+    else if (get_flag_security_proc_failed())
+    {
+        mitm_activated = false;
+        send_led_mode(); // If enters pin number fails, returns to advertising led mode layer.
+        show_bt_layer = true;
+        clear_flag_security_proc_failed();
+    }
+
+    if (mitm_activated && ble_connected())
+    {
+        mitm_activated = false;
+    }
+
+    // Gives time to the EPPROM to update
+    static bool activated_advertising = false;
+
+    if (ble_is_advertising_mode())
+    {
+        // Just activate once.
+        if (!activated_advertising )
+        {
+            // set_pairing_led_effect();
+
+#if BLE_MANAGER_DEBUG_LOG
+            NRF_LOG_DEBUG("Ble_manager: Channel %i, advertising mode.", ble_flash_data.currentChannel);
+            NRF_LOG_FLUSH();
+#endif
+
+            ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+            show_bt_layer = true;
+            send_led_mode();
+            activated_advertising = true;
+        }
+    }
+    else if( ble_connected() )
+    {
+        if ( activated_advertising )
+        {
+            ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
+            ledBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
+            set_paired_channel_led(ble_flash_data.currentChannel, true);
+            send_led_mode();
+            ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
+            activated_advertising = false;
+            exit_pairing_mode();
+
+            trigger_save_conn_timer = true;
+        }
+    }
+    else if (activated_advertising && ble_is_idle())
+    {
+        activated_advertising = false;
+        LEDControl::disable();
+        Communications_protocol::Packet p{};
+        p.header.command = Communications_protocol::SLEEP;
+        Communications.sendPacket(p);
+    }
+
+    // Reconection of side
+    if (!activated_advertising && ble_is_idle() && LEDControl::isEnabled())
+    {
+        ble_goto_advertising_mode();
+        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        send_led_mode();
+    }
 }
 
 kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
