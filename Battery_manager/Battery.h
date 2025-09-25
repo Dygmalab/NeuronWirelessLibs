@@ -18,7 +18,6 @@
  *
  */
 #pragma once
-#include "kaleidoscope/plugin.h"
 #include "kaleidoscope/Runtime.h"
 #include <Kaleidoscope-EEPROM-Settings.h>
 #include <Kaleidoscope-Ranges.h>
@@ -27,8 +26,7 @@
 #include "kbd_if.h"
 
 namespace kaleidoscope {
-namespace plugin {
-class Battery : public Plugin {
+class Battery {
    public:
     result_t init( void );
 
@@ -54,8 +52,6 @@ class Battery : public Plugin {
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
-
-}  // namespace plugin
 }  // namespace kaleidoscope
 
-extern kaleidoscope::plugin::Battery Battery;
+extern kaleidoscope::Battery Battery;

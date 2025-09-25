@@ -34,9 +34,6 @@
 
 namespace kaleidoscope
 {
-namespace plugin
-{
-
 
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
@@ -198,16 +195,16 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
         return KBDAPI_EVENT_RESULT_IGNORED;
     }
 
-    if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
+    if ( p_key->toggled_on == true &&  plugin::FirmwareVersion::keyboard_is_wireless() )
     {
         ::LEDControl.set_mode(9);
         ::LEDControl.set_force_mode(true);
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
+        plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
     }
 
     if ( p_key->toggled_off == true )
     {
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
+        plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
         ::LEDControl.set_force_mode(false);
         ::LEDControl.set_mode(0);
     }
@@ -310,7 +307,6 @@ const kbdif_handlers_t Battery::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
-} // namespace plugin
 } //  namespace kaleidoscope
 
-kaleidoscope::plugin::Battery Battery;
+kaleidoscope::Battery Battery;

@@ -1,5 +1,5 @@
 /*
- * kaleidoscope::plugin::Ble_manager -- Manage Bluetooth low energy status and functions in wireless devices
+ * Ble_manager -- Manage Bluetooth low energy status and functions in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
@@ -22,7 +22,6 @@
 
 #include "Colormap-Defy.h"
 #include "kaleidoscope/Runtime.h"
-#include "kaleidoscope/plugin.h"
 #include "kaleidoscope/plugin/FocusSerial.h"
 #include <Arduino.h>
 #include <Kaleidoscope-EEPROM-Settings.h>
@@ -31,8 +30,6 @@
 #include "kbd_if.h"
 
 namespace kaleidoscope
-{
-namespace plugin
 {
 
 #define BLE_CONNECTIONS_COUNT   5
@@ -107,7 +104,7 @@ class Ble_flash_data
     }
 };
 
-class BleManager : public Plugin
+class BleManager
 {
   public:
     bool trigger_save_name_timer = false;
@@ -210,7 +207,6 @@ class BleManager : public Plugin
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
 
-} // namespace plugin
 } // namespace kaleidoscope
 
-extern kaleidoscope::plugin::BleManager _BleManager;
+extern kaleidoscope::BleManager _BleManager;

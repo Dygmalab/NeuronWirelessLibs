@@ -37,8 +37,6 @@ void device_name_evt_handler(void);
 
 namespace kaleidoscope
 {
-namespace plugin
-{
 
 
 #define BLE_MANAGER_DEBUG_LOG   1
@@ -494,7 +492,7 @@ void BleManager::exit_pairing_mode(void)
 #endif
 
     show_bt_layer = false;
-    ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
+    plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          false,
                                          true);
     ::LEDControl.set_force_mode(false);
@@ -520,7 +518,7 @@ void BleManager::send_led_mode(void)
 {
     ::LEDControl.set_mode(10);
     ::LEDControl.set_force_mode(true);
-    ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
+    plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          true,
                                          false);
 }
@@ -569,7 +567,7 @@ void BleManager::set_bt_name_from_specifications(const char *spec)
 
 void BleManager::run()
 {
-    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
+    if (!ble_innited() || !plugin::FirmwareVersion::keyboard_is_wireless())
     {
         return;
     }
@@ -635,14 +633,14 @@ void BleManager::run()
     else if (activated_advertising && ble_is_idle())
     {
         activated_advertising = false;
-        LEDControl::disable();
+        plugin::LEDControl::disable();
         Communications_protocol::Packet p{};
         p.header.command = Communications_protocol::SLEEP;
         Communications.sendPacket(p);
     }
 
     // Reconection of side
-    if (!activated_advertising && ble_is_idle() && LEDControl::isEnabled())
+    if (!activated_advertising && ble_is_idle() && plugin::LEDControl::isEnabled())
     {
         ble_goto_advertising_mode();
         ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
@@ -655,7 +653,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     /* Exit conditions. */
     if (!ble_innited())
     {
-        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && FirmwareVersion::keyboard_is_wireless())
+        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && plugin::FirmwareVersion::keyboard_is_wireless())
         {
             auto const &keyScanner = Runtime.device().keyScanner();
             auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
@@ -741,7 +739,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         ble_goto_advertising_mode();
         ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
-        LEDControl::enable();
+        plugin::LEDControl::enable();
     }
 
     if (show_bt_layer)
@@ -964,11 +962,10 @@ const kbdif_handlers_t BleManager::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
-} // namespace plugin
 } //  namespace kaleidoscope
 
 
-kaleidoscope::plugin::BleManager _BleManager;
+kaleidoscope::BleManager _BleManager;
 
 
 void device_name_evt_handler(void)
