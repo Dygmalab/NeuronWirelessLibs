@@ -113,7 +113,6 @@ class BleManager : public Plugin
     bool trigger_save_name_timer = false;
 
     EventHandlerResult beforeEachCycle();
-    EventHandlerResult onFocusEvent(const char *command);
 
     result_t init( void );
 
@@ -207,6 +206,7 @@ class BleManager : public Plugin
     static const kbdif_handlers_t kbdif_handlers;
 
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
+    static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
 
 } // namespace plugin

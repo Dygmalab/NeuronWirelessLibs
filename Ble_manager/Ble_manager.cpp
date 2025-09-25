@@ -652,70 +652,6 @@ void BleManager::set_bt_name_from_specifications(const char *spec)
     ble_device_name = spec;
 }
 
-EventHandlerResult BleManager::onFocusEvent(const char *command)
-{
-    //    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
-    //
-    //    if (strncmp(command, "wireless.bluetooth.", 19) != 0) return EventHandlerResult::OK;
-    //    if (strcmp(command + 19, "devicesMap") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //            for (const auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.send();
-    //            }
-    //        }
-    //        else
-    //        {
-    //            for (auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.read();
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
-    //
-    //    // This command need reset
-    //    if (strcmp(command + 19, "deviceName") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //#if BLE_MANAGER_DEBUG_LOG
-    //            NRF_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
-    //#endif
-    //
-    //            for (const auto &device_name_letter : ble_flash_data.keyb_ble_name)
-    //            {
-    //                ::Focus.send((uint8_t)device_name_letter);
-    //            }
-    //        }
-    //        else
-    //        {
-    //#if BLE_MANAGER_DEBUG_LOG
-    //            NRF_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
-    //#endif
-    //
-    //            for (auto &device_name_letter : ble_flash_data.keyb_ble_name)
-    //            {
-    //                uint8_t aux;
-    //                ::Focus.read(aux);
-    //                device_name_letter = (char)aux;
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
-
-    // return EventHandlerResult::EVENT_CONSUMED;
-    return EventHandlerResult::OK;
-}
-
 kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
 {
     /* Exit conditions. */
@@ -960,9 +896,74 @@ kbdapi_event_result_t BleManager::kbdif_key_event_cb( void * p_instance, kbdapi_
     return p_BleManager->kbdif_key_event_process( p_key );
 }
 
+kbdapi_event_result_t BleManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
+{
+    //    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
+    //
+    //    if (strncmp(command, "wireless.bluetooth.", 19) != 0) return EventHandlerResult::OK;
+    //    if (strcmp(command + 19, "devicesMap") == 0)
+    //    {
+    //        if (::Focus.isEOL())
+    //        {
+    //            for (const auto &connection : ble_flash_data.ble_connections)
+    //            {
+    //                connection.send();
+    //            }
+    //        }
+    //        else
+    //        {
+    //            for (auto &connection : ble_flash_data.ble_connections)
+    //            {
+    //                connection.read();
+    //            }
+    //
+    //            // Save it in flash memory.
+    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
+    //            Runtime.storage().commit();
+    //        }
+    //    }
+    //
+    //    // This command need reset
+    //    if (strcmp(command + 19, "deviceName") == 0)
+    //    {
+    //        if (::Focus.isEOL())
+    //        {
+    //#if BLE_MANAGER_DEBUG_LOG
+    //            NRF_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
+    //#endif
+    //
+    //            for (const auto &device_name_letter : ble_flash_data.keyb_ble_name)
+    //            {
+    //                ::Focus.send((uint8_t)device_name_letter);
+    //            }
+    //        }
+    //        else
+    //        {
+    //#if BLE_MANAGER_DEBUG_LOG
+    //            NRF_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
+    //#endif
+    //
+    //            for (auto &device_name_letter : ble_flash_data.keyb_ble_name)
+    //            {
+    //                uint8_t aux;
+    //                ::Focus.read(aux);
+    //                device_name_letter = (char)aux;
+    //            }
+    //
+    //            // Save it in flash memory.
+    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
+    //            Runtime.storage().commit();
+    //        }
+    //    }
+
+    // return EventHandlerResult::EVENT_CONSUMED;
+    return KBDAPI_EVENT_RESULT_IGNORED;
+}
+
 const kbdif_handlers_t BleManager::kbdif_handlers =
 {
     .key_event_cb = kbdif_key_event_cb,
+    .command_event_cb = kbdif_command_event_cb,
 };
 
 } // namespace plugin
