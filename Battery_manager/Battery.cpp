@@ -49,95 +49,6 @@ uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
 
-EventHandlerResult Battery::onFocusEvent(const char *command)
-{
-    if (::Focus.handleHelp(command,
-        "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (strncmp(command, "wireless.battery.", 17) != 0)
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (strcmp(command + 17, "right.level") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
-#endif
-            ::Focus.send(battery_level_right);
-        }
-    }
-
-    if (strcmp(command + 17, "left.level") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.left.level");
-#endif
-            ::Focus.send(battery_level_left);
-        }
-    }
-
-    if (strcmp(command + 17, "right.status") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.right.status");
-#endif
-            ::Focus.send(status_right);
-        }
-    }
-
-    if (strcmp(command + 17, "left.status") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-            Communications_protocol::Packet p{};
-            p.header.command = Communications_protocol::BATTERY_STATUS;
-            Communications.sendPacket(p);
-
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.left.status");
-#endif
-            ::Focus.send(status_left);
-        }
-    }
-
-    if (strcmp(command + 17, "savingMode") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
-#endif
-            ::Focus.send(saving_mode);
-        }
-        else
-        {
-            ::Focus.read(saving_mode);
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
-#endif
-            Communications_protocol::Packet p{};
-            p.header.command = Communications_protocol::BATTERY_SAVING;
-            p.header.size = 1;
-            p.data[0] = saving_mode;
-            Communications.sendPacket(p);
-            Runtime.storage().put(settings_saving_, saving_mode);
-            Runtime.storage().commit();
-        }
-    }
-
-    return EventHandlerResult::EVENT_CONSUMED;
-}
-
 bool inline filterHand(Communications_protocol::Devices incomingDevice, bool right_or_left)
 {
     if (right_or_left == 1)
@@ -304,9 +215,99 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
     return KBDAPI_EVENT_RESULT_CONSUMED;
 }
 
+kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const char * p_command )
+{
+    if (::Focus.handleHelp(p_command,
+        "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strncmp(p_command, "wireless.battery.", 17) != 0)
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strcmp(p_command + 17, "right.level") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
+#endif
+            ::Focus.send(battery_level_right);
+        }
+    }
+
+    if (strcmp(p_command + 17, "left.level") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.left.level");
+#endif
+            ::Focus.send(battery_level_left);
+        }
+    }
+
+    if (strcmp(p_command + 17, "right.status") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.right.status");
+#endif
+            ::Focus.send(status_right);
+        }
+    }
+
+    if (strcmp(p_command + 17, "left.status") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+            Communications_protocol::Packet p{};
+            p.header.command = Communications_protocol::BATTERY_STATUS;
+            Communications.sendPacket(p);
+
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.left.status");
+#endif
+            ::Focus.send(status_left);
+        }
+    }
+
+    if (strcmp(p_command + 17, "savingMode") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
+#endif
+            ::Focus.send(saving_mode);
+        }
+        else
+        {
+            ::Focus.read(saving_mode);
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
+#endif
+            Communications_protocol::Packet p{};
+            p.header.command = Communications_protocol::BATTERY_SAVING;
+            p.header.size = 1;
+            p.data[0] = saving_mode;
+            Communications.sendPacket(p);
+            Runtime.storage().put(settings_saving_, saving_mode);
+            Runtime.storage().commit();
+        }
+    }
+
+    return KBDAPI_EVENT_RESULT_CONSUMED;
+}
+
 const kbdif_handlers_t Battery::kbdif_handlers =
 {
     .key_event_cb = kbdif_key_event_cb,
+    .command_event_cb = kbdif_command_event_cb,
 };
 
 } // namespace plugin
