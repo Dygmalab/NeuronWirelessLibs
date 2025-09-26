@@ -47,7 +47,7 @@ EventHandlerResult RadioManager::onSetup()
     return EventHandlerResult::OK;
 }
 
-void RadioManager::init()
+void RadioManager::enable()
 {
     NRF_LOG_INFO("Working with RF");
     inited = true;

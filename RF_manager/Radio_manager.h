@@ -32,9 +32,10 @@ namespace plugin {
 class RadioManager : public Plugin {
    public:
     EventHandlerResult onSetup();
-    static void init();
-    static void poll();
     EventHandlerResult onFocusEvent(const char *command);
+
+    static void enable();
+    static void poll();
 
     static bool isEnabled();
     static bool isInited();
