@@ -25,17 +25,45 @@
 #include "Kaleidoscope-FocusSerial.h"
 #include "nrf_gpio.h"
 #include "rf_host_device_api.h"
+
+#include "kbd_if_manager.h"
+
 namespace kaleidoscope
-{
-namespace plugin
 {
 
 uint16_t RadioManager::settings_base_ = 0;
 bool RadioManager::inited = false;
 RadioManager::Power RadioManager::power_rf = LOW_P;
 uint16_t RadioManager::channel_hop;
-EventHandlerResult RadioManager::onSetup()
+
+result_t RadioManager::kbdif_initialize()
 {
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = NULL;       /* The module is whole static */
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( RadioManager::p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
+}
+
+result_t RadioManager::init()
+{
+    result_t result = RESULT_ERR;
+
+    result = kbdif_initialize();
+    EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
     settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(power_rf));
     Runtime.storage().get(settings_base_, power_rf);
     if (power_rf == 0xFF)
@@ -44,7 +72,9 @@ EventHandlerResult RadioManager::onSetup()
         Runtime.storage().put(settings_base_, power_rf);
         Runtime.storage().commit();
     }
-    return EventHandlerResult::OK;
+
+_EXIT:
+    return result;
 }
 
 void RadioManager::enable()
@@ -77,14 +107,30 @@ void RadioManager::setPowerRF()
     }
 }
 
-EventHandlerResult RadioManager::onFocusEvent(const char *command)
+bool RadioManager::isInited()
 {
-    if (::Focus.handleHelp(command, "wireless.rf.power\nwireless.rf.channelHop\nwireless.rf.syncPairing")) return EventHandlerResult::OK;
+    return inited;
+}
 
-    if (strncmp(command, "wireless.rf.", 12) != 0) return EventHandlerResult::OK;
+void RadioManager::poll()
+{
+    return rfgw_poll();
+}
+
+kbdapi_event_result_t RadioManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
+{
+    if (::Focus.handleHelp(p_command, "wireless.rf.power\nwireless.rf.channelHop\nwireless.rf.syncPairing"))
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strncmp(p_command, "wireless.rf.", 12) != 0)
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
 
     // Will be apply
-    if (strcmp(command + 12, "power") == 0)
+    if (strcmp(p_command + 12, "power") == 0)
     {
         if (::Focus.isEOL())
         {
@@ -105,7 +151,7 @@ EventHandlerResult RadioManager::onFocusEvent(const char *command)
         }
     }
 
-    if (strcmp(command + 12, "channelHop") == 0)
+    if (strcmp(p_command + 12, "channelHop") == 0)
     {
         if (::Focus.isEOL())
         {
@@ -119,7 +165,7 @@ EventHandlerResult RadioManager::onFocusEvent(const char *command)
         }
     }
 
-    if (strcmp(command + 12, "syncPairing") == 0)
+    if (strcmp(p_command + 12, "syncPairing") == 0)
     {
         if (::Focus.isEOL())
         {
@@ -133,20 +179,15 @@ EventHandlerResult RadioManager::onFocusEvent(const char *command)
         }
     }
 
-    return EventHandlerResult::EVENT_CONSUMED;
+    return KBDAPI_EVENT_RESULT_CONSUMED;
 }
 
-bool RadioManager::isInited()
+const kbdif_handlers_t RadioManager::kbdif_handlers =
 {
-    return inited;
-}
+    .key_event_cb = NULL,
+    .command_event_cb = kbdif_command_event_cb,
+};
 
-void RadioManager::poll()
-{
-    return rfgw_poll();
-}
-
-} // namespace plugin
 } //  namespace kaleidoscope
 
-kaleidoscope::plugin::RadioManager RadioManager;
+kaleidoscope::RadioManager _RadioManager;

@@ -20,25 +20,28 @@
 
 #pragma once
 
-#include "kaleidoscope/plugin.h"
 #include "kaleidoscope/Runtime.h"
 #include <Kaleidoscope-EEPROM-Settings.h>
 #include <Kaleidoscope-Ranges.h>
 #include <Arduino.h>
 
+#include "kbd_if.h"
 
 namespace kaleidoscope {
-namespace plugin {
-class RadioManager : public Plugin {
-   public:
-    EventHandlerResult onSetup();
-    EventHandlerResult onFocusEvent(const char *command);
+class RadioManager {
+  public:
 
-    static void enable();
-    static void poll();
+    result_t init();
+    void enable();
+    void poll();
 
-    static bool isEnabled();
-    static bool isInited();
+    bool isEnabled();
+    bool isInited();
+
+  private:
+    kbdif_t * p_kbdif = NULL;
+    result_t kbdif_initialize(void);
+
   private:
 
     enum Power :uint8_t {
@@ -51,9 +54,12 @@ class RadioManager : public Plugin {
     static Power power_rf;
     static uint16_t settings_base_;
     static void setPowerRF();
+
+    static const kbdif_handlers_t kbdif_handlers;
+
+    static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
 
-}  // namespace plugin
 }  // namespace kaleidoscope
 
-extern kaleidoscope::plugin::RadioManager RadioManager;
+extern kaleidoscope::RadioManager _RadioManager;
