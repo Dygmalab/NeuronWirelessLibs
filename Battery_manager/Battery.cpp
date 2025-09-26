@@ -60,27 +60,6 @@ bool inline filterHand(Communications_protocol::Devices incomingDevice, bool rig
     }
 }
 
-result_t Battery::kbdif_initialize()
-{
-    result_t result = RESULT_ERR;
-    kbdif_conf_t config;
-
-    /* Prepare the kbdif configuration */
-    config.p_instance = this;
-    config.handlers = &kbdif_handlers;
-
-    /* Initialize the kbdif */
-    result = kbdif_init( &p_kbdif, &config );
-    EXIT_IF_ERR( result, "kbdif_init failed" );
-
-    /* Add the kbdif into the kbdif manager */
-    result = kbdifmgr_add( p_kbdif );
-    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
-
-_EXIT:
-    return result;
-}
-
 result_t Battery::init()
 {
     result_t result = RESULT_ERR;
@@ -186,6 +165,27 @@ uint8_t Battery::get_battery_status_right(void)
     */
 
     return status_right;
+}
+
+result_t Battery::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = this;
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
 }
 
 kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key )

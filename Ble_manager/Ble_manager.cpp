@@ -44,26 +44,6 @@ namespace kaleidoscope
 
 Do_once clear_pin_digits_count;
 
-result_t BleManager::kbdif_initialize()
-{
-    result_t result = RESULT_ERR;
-    kbdif_conf_t config;
-
-    /* Prepare the kbdif configuration */
-    config.p_instance = this;
-    config.handlers = &kbdif_handlers;
-
-    /* Initialize the kbdif */
-    result = kbdif_init( &p_kbdif, &config );
-    EXIT_IF_ERR( result, "kbdif_init failed" );
-
-    /* Add the kbdif into the kbdif manager */
-    result = kbdifmgr_add( p_kbdif );
-    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
-
-_EXIT:
-    return result;
-}
 
 result_t BleManager::init()
 {
@@ -646,6 +626,27 @@ void BleManager::run()
         ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
     }
+}
+
+result_t BleManager::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = this;
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
 }
 
 kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )

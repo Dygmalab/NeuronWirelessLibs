@@ -36,27 +36,6 @@ bool RadioManager::inited = false;
 RadioManager::Power RadioManager::power_rf = LOW_P;
 uint16_t RadioManager::channel_hop;
 
-result_t RadioManager::kbdif_initialize()
-{
-    result_t result = RESULT_ERR;
-    kbdif_conf_t config;
-
-    /* Prepare the kbdif configuration */
-    config.p_instance = NULL;       /* The module is whole static */
-    config.handlers = &kbdif_handlers;
-
-    /* Initialize the kbdif */
-    result = kbdif_init( &p_kbdif, &config );
-    EXIT_IF_ERR( result, "kbdif_init failed" );
-
-    /* Add the kbdif into the kbdif manager */
-    result = kbdifmgr_add( RadioManager::p_kbdif );
-    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
-
-_EXIT:
-    return result;
-}
-
 result_t RadioManager::init()
 {
     result_t result = RESULT_ERR;
@@ -115,6 +94,27 @@ bool RadioManager::isInited()
 void RadioManager::poll()
 {
     return rfgw_poll();
+}
+
+result_t RadioManager::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = NULL;       /* The module is whole static */
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( RadioManager::p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
 }
 
 kbdapi_event_result_t RadioManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
