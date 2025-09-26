@@ -1,5 +1,5 @@
 /* -*- mode: c++ -*-
- * kaleidoscope::plugin::Battery_manager -- Manage battery levels and status in wireless devices
+ * Battery_manager -- Manage battery levels and status in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
