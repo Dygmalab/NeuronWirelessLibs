@@ -516,8 +516,8 @@ void BleManager::set_channel_in_use( kbdapi_key_t * p_key )
 
     for (int i = 0; i < 5; i++)
     {
-        if ( (p_key->col == colMapping[i][0] || p_key->col == colMapping[i][1]) &&
-            (p_key->row == 0 || p_key->row == 1) )
+        if ( (p_key->coord.col == colMapping[i][0] || p_key->coord.col == colMapping[i][1]) &&
+            (p_key->coord.row == 0 || p_key->coord.row == 1) )
         {
             channel_in_use = static_cast<Channels>(i);
 
@@ -745,22 +745,22 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 
     if (show_bt_layer)
     {
-        if (((p_key->col == 0 && p_key->row == 0) || (p_key->col == 9 && p_key->row == 0)) && p_key->toggled_on)
+        if (((p_key->coord.col == 0 && p_key->coord.row == 0) || (p_key->coord.col == 9 && p_key->coord.row == 0)) && p_key->toggled_on)
         {
             reset_mcu();
         }
 
         /* Erease previous paired channels*/
-        if (((p_key->col == 1 && p_key->row == 1) ||  // Q key
-             (p_key->col == 2 && p_key->row == 1) ||  // W key
-             (p_key->col == 3 && p_key->row == 1) ||  // E key
-             (p_key->col == 4 && p_key->row == 1) ||  // R key
-             (p_key->col == 5 && p_key->row == 1) ||  // T key
-             (p_key->col == 10 && p_key->row == 1) || // Y key
-             (p_key->col == 11 && p_key->row == 1) || // U key
-             (p_key->col == 12 && p_key->row == 1) || // I key
-             (p_key->col == 13 && p_key->row == 1) || // O key
-             (p_key->col == 14 && p_key->row == 1))   // PT key
+        if (((p_key->coord.col == 1 && p_key->coord.row == 1) ||  // Q key
+             (p_key->coord.col == 2 && p_key->coord.row == 1) ||  // W key
+             (p_key->coord.col == 3 && p_key->coord.row == 1) ||  // E key
+             (p_key->coord.col == 4 && p_key->coord.row == 1) ||  // R key
+             (p_key->coord.col == 5 && p_key->coord.row == 1) ||  // T key
+             (p_key->coord.col == 10 && p_key->coord.row == 1) || // Y key
+             (p_key->coord.col == 11 && p_key->coord.row == 1) || // U key
+             (p_key->coord.col == 12 && p_key->coord.row == 1) || // I key
+             (p_key->coord.col == 13 && p_key->coord.row == 1) || // O key
+             (p_key->coord.col == 14 && p_key->coord.row == 1))   // PT key
             && p_key->is_pressed)
         {
             set_channel_in_use( p_key );
@@ -787,15 +787,15 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         }
 
         /*Change channel in use*/
-        if (((p_key->col == 1 && p_key->row == 0) ||                                                  // 1 key
-             (p_key->col == 2 && p_key->row == 0) ||                                                  // 2 key
-             (p_key->col == 3 && p_key->row == 0) ||                                                  // 3 key
-             (p_key->col == 4 && p_key->row == 0) ||                                                  // 4 key
-             (p_key->col == 5 && p_key->row == 0) || (p_key->col == 10 && p_key->row == 0) || // 6 key
-             (p_key->col == 11 && p_key->row == 0) ||                                                 // 7 key
-             (p_key->col == 12 && p_key->row == 0) ||                                                 // 8 key
-             (p_key->col == 13 && p_key->row == 0) ||                                                 // 9 key
-             (p_key->col == 14 && p_key->row == 0))                                                   // 0 key
+        if (((p_key->coord.col == 1 && p_key->coord.row == 0) ||                                                  // 1 key
+             (p_key->coord.col == 2 && p_key->coord.row == 0) ||                                                  // 2 key
+             (p_key->coord.col == 3 && p_key->coord.row == 0) ||                                                  // 3 key
+             (p_key->coord.col == 4 && p_key->coord.row == 0) ||                                                  // 4 key
+             (p_key->coord.col == 5 && p_key->coord.row == 0) || (p_key->coord.col == 10 && p_key->coord.row == 0) || // 6 key
+             (p_key->coord.col == 11 && p_key->coord.row == 0) ||                                                 // 7 key
+             (p_key->coord.col == 12 && p_key->coord.row == 0) ||                                                 // 8 key
+             (p_key->coord.col == 13 && p_key->coord.row == 0) ||                                                 // 9 key
+             (p_key->coord.col == 14 && p_key->coord.row == 0))                                                   // 0 key
             && p_key->was_pressed)
         {
             set_channel_in_use( p_key );
