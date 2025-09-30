@@ -547,7 +547,7 @@ void BleManager::set_bt_name_from_specifications(const char *spec)
 
 void BleManager::run()
 {
-    if (!ble_innited() || !plugin::FirmwareVersion::keyboard_is_wireless())
+    if (!ble_innited() || !FirmwareVersion::keyboard_is_wireless())
     {
         return;
     }
@@ -654,7 +654,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     /* Exit conditions. */
     if (!ble_innited())
     {
-        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && plugin::FirmwareVersion::keyboard_is_wireless())
+        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && FirmwareVersion::keyboard_is_wireless())
         {
             auto const &keyScanner = Runtime.device().keyScanner();
             auto isDefyLeftWired = keyScanner.leftSideWiredConnection();

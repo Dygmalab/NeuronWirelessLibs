@@ -195,7 +195,7 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
         return KBDAPI_EVENT_RESULT_IGNORED;
     }
 
-    if ( p_key->toggled_on == true &&  plugin::FirmwareVersion::keyboard_is_wireless() )
+    if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
     {
         ::LEDControl.set_mode(9);
         ::LEDControl.set_force_mode(true);
