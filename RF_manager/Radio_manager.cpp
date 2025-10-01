@@ -19,17 +19,12 @@
  */
 
 #include "Radio_manager.h"
-#include "Adafruit_USBD_Device.h"
-#include "CRC_wrapper.h"
 #include "Communications.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "nrf_gpio.h"
+#include "Kaleidoscope-EEPROM-Settings.h"
 #include "rf_host_device_api.h"
 
 #include "kbd_if_manager.h"
-
-namespace kaleidoscope
-{
 
 uint16_t RadioManager::settings_base_ = 0;
 bool RadioManager::inited = false;
@@ -44,12 +39,12 @@ result_t RadioManager::init()
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
     settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(power_rf));
-    Runtime.storage().get(settings_base_, power_rf);
+    kaleidoscope::Runtime.storage().get(settings_base_, power_rf);
     if (power_rf == 0xFF)
     {
         power_rf = LOW_P;
-        Runtime.storage().put(settings_base_, power_rf);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(settings_base_, power_rf);
+        kaleidoscope::Runtime.storage().commit();
     }
 
 _EXIT:
@@ -145,8 +140,8 @@ kbdapi_event_result_t RadioManager::kbdif_command_event_cb( void * p_instance, c
             {
                 power_rf = (RadioManager::Power)power;
                 setPowerRF();
-                Runtime.storage().put(settings_base_, power_rf);
-                Runtime.storage().commit();
+                kaleidoscope::Runtime.storage().put(settings_base_, power_rf);
+                kaleidoscope::Runtime.storage().commit();
             }
         }
     }
@@ -188,6 +183,4 @@ const kbdif_handlers_t RadioManager::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
-} //  namespace kaleidoscope
-
-kaleidoscope::RadioManager _RadioManager;
+class RadioManager RadioManager;
