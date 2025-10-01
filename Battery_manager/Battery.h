@@ -18,14 +18,9 @@
  *
  */
 #pragma once
-#include "kaleidoscope/Runtime.h"
-#include <Kaleidoscope-EEPROM-Settings.h>
-#include <Kaleidoscope-Ranges.h>
-#include <Arduino.h>
 
 #include "kbd_if.h"
 
-namespace kaleidoscope {
 class Battery {
    public:
     result_t init( void );
@@ -52,6 +47,5 @@ class Battery {
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
-}  // namespace kaleidoscope
 
-extern kaleidoscope::Battery Battery;
+extern class Battery Battery;

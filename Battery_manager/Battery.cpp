@@ -22,8 +22,7 @@
 #include "Colormap-Defy.h"
 #include "Communications.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "kaleidoscope/key_events.h"
-#include "kaleidoscope/plugin/LEDControlDefy.h"
+#include "Kaleidoscope-EEPROM-Settings.h"
 #include "FirmwareVersion.h"
 
 #include "kbd_if_manager.h"
@@ -31,9 +30,6 @@
 
 #define NOT_CHARGING 0
 
-
-namespace kaleidoscope
-{
 
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
@@ -70,14 +66,14 @@ result_t Battery::init()
     // Save saving_mode variable in EEPROM
     settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(saving_mode));
     uint8_t saving;
-    Runtime.storage().get(settings_saving_, saving);
+    kaleidoscope::Runtime.storage().get(settings_saving_, saving);
     if (saving == 0xFF)
     { // If is the first time we read from memory
         saving_mode = 0;
-        Runtime.storage().put(settings_saving_, saving_mode); // Save default value 0.
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(settings_saving_, saving_mode); // Save default value 0.
+        kaleidoscope::Runtime.storage().commit();
     }
-    Runtime.storage().get(settings_saving_, saving_mode); // safe get
+    kaleidoscope::Runtime.storage().get(settings_saving_, saving_mode); // safe get
 
     Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
         if (filterHand(packet.header.device, false))
@@ -199,12 +195,12 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
     {
         ::LEDControl.set_mode(9);
         ::LEDControl.set_force_mode(true);
-        plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
+        kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
     }
 
     if ( p_key->toggled_off == true )
     {
-        plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
+        kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
         ::LEDControl.set_force_mode(false);
         ::LEDControl.set_mode(0);
     }
@@ -293,8 +289,8 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
             p.header.size = 1;
             p.data[0] = saving_mode;
             Communications.sendPacket(p);
-            Runtime.storage().put(settings_saving_, saving_mode);
-            Runtime.storage().commit();
+            kaleidoscope::Runtime.storage().put(settings_saving_, saving_mode);
+            kaleidoscope::Runtime.storage().commit();
         }
     }
 
@@ -307,6 +303,5 @@ const kbdif_handlers_t Battery::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
-} //  namespace kaleidoscope
 
-kaleidoscope::Battery Battery;
+class Battery Battery;
