@@ -209,4 +209,4 @@ class BleManager
 
 } // namespace kaleidoscope
 
-extern kaleidoscope::BleManager _BleManager;
+extern class BleManager BleManager;

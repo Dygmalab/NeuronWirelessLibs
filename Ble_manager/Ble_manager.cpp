@@ -966,7 +966,7 @@ const kbdif_handlers_t BleManager::kbdif_handlers =
 } //  namespace kaleidoscope
 
 
-kaleidoscope::BleManager _BleManager;
+class BleManager BleManager;
 
 
 void device_name_evt_handler(void)
@@ -975,5 +975,5 @@ void device_name_evt_handler(void)
     NRF_LOG_INFO("Ble_manager: Event device name %s", get_connected_device_name_ptr());
 #endif
 
-    _BleManager.trigger_save_name_timer = true;
+    BleManager.trigger_save_name_timer = true;
 }
