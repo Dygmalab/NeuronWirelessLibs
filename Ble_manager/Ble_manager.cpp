@@ -19,14 +19,9 @@
  */
 
 #include "Ble_manager.h"
-
-#include "Ble_composite_dev.h"
-#include "Communications.h"
-#include "Kaleidoscope-FocusSerial.h"
+#include "Colormap-Defy.h"
+#include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
-#include "cstdio"
-#include "kaleidoscope/key_events.h"
-#include "kaleidoscope/plugin/LEDControlDefy.h"
 #include "FirmwareVersion.h"
 
 #include "Do_once.h"
@@ -34,10 +29,6 @@
 
 
 void device_name_evt_handler(void);
-
-namespace kaleidoscope
-{
-
 
 #define BLE_MANAGER_DEBUG_LOG   1
 
@@ -55,22 +46,22 @@ result_t BleManager::init()
 
     flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
 
-    Runtime.storage().get(flash_base_addr, ble_flash_data);
+    kaleidoscope::Runtime.storage().get(flash_base_addr, ble_flash_data);
     // For now lest think that if this variable is invalid, restart everything.
     if (ble_flash_data.currentChannel == 0xFF)
     {
         ble_flash_data.reset();
 
         // Save it in flash memory.
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+        kaleidoscope::Runtime.storage().commit();
     }
 
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_DEBUG("Ble_manager: Current channel %i", ble_flash_data.currentChannel);
 #endif
 
-    Runtime.storage().get(flash_base_addr, ble_flash_data);
+    kaleidoscope::Runtime.storage().get(flash_base_addr, ble_flash_data);
     update_channel_and_name();
     // UX STUFFf
     i = 0;
@@ -155,8 +146,8 @@ void BleManager::enable(void)
                     paired_device.set_peer_id(peer_list[i]);
 
                     // Save it in flash memory.
-                    Runtime.storage().put(flash_base_addr, ble_flash_data);
-                    Runtime.storage().commit();
+                    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+                    kaleidoscope::Runtime.storage().commit();
 
                     break;
                 }
@@ -183,8 +174,8 @@ void BleManager::enable(void)
             paired_device.reset();
 
             // Save it in flash memory.
-            Runtime.storage().put(flash_base_addr, ble_flash_data);
-            Runtime.storage().commit();
+            kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+            kaleidoscope::Runtime.storage().commit();
         }
     }
 }
@@ -197,8 +188,8 @@ void BleManager::update_channel_and_name(void)
     {
         set_device_name(ble_device_name);
 
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+        kaleidoscope::Runtime.storage().commit();
     }
     else
     {
@@ -241,13 +232,13 @@ void BleManager::timer_save_conn_run(uint32_t timeout_ms)
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Start timer save connection.");
 #endif
-        ti_save_new_conn = Runtime.millisAtCycleStart();
+        ti_save_new_conn = kaleidoscope::Runtime.millisAtCycleStart();
         timer_save_conn_start_count = true;
     }
 
     if (timer_save_conn_start_count)
     {
-        if (Runtime.hasTimeExpired(ti_save_new_conn, timeout_ms))
+        if (kaleidoscope::Runtime.hasTimeExpired(ti_save_new_conn, timeout_ms))
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Timeout timer save connection.");
@@ -299,8 +290,8 @@ void BleManager::save_connection(void)
         NRF_LOG_DEBUG("Ble_manager: Saving new connection...");
 #endif
 
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+        kaleidoscope::Runtime.storage().commit();
     }
 }
 
@@ -318,13 +309,13 @@ void BleManager::timer_save_name_run(uint32_t timeout_ms)
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Start timer save name.");
 #endif
-        ti_save_new_name = Runtime.millisAtCycleStart();
+        ti_save_new_name = kaleidoscope::Runtime.millisAtCycleStart();
         timer_save_name_start_count = true;
     }
 
     if (timer_save_name_start_count)
     {
-        if (Runtime.hasTimeExpired(ti_save_new_name, timeout_ms))
+        if (kaleidoscope::Runtime.hasTimeExpired(ti_save_new_name, timeout_ms))
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Timeout timer save name.");
@@ -368,8 +359,8 @@ void BleManager::save_device_name(void)
         NRF_LOG_DEBUG("Ble_manager: Saving device name...");
 #endif
 
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+        kaleidoscope::Runtime.storage().commit();
     }
 }
 
@@ -447,8 +438,8 @@ void BleManager::erase_paired_device(uint8_t index_channel)
         set_paired_channel_led(index_channel, false); // set channel related bit to 0
 
         // Save it in flash memory.
-        Runtime.storage().put(flash_base_addr, ble_flash_data);
-        Runtime.storage().commit();
+        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+        kaleidoscope::Runtime.storage().commit();
 
         if (index_channel == ble_flash_data.currentChannel)
         {
@@ -472,7 +463,7 @@ void BleManager::exit_pairing_mode(void)
 #endif
 
     show_bt_layer = false;
-    plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
+    kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          false,
                                          true);
     ::LEDControl.set_force_mode(false);
@@ -498,7 +489,7 @@ void BleManager::send_led_mode(void)
 {
     ::LEDControl.set_mode(10);
     ::LEDControl.set_force_mode(true);
-    plugin::ColormapEffectDefy::updateBrigthness(plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
+    kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          true,
                                          false);
 }
@@ -536,8 +527,8 @@ void BleManager::setForceBle(bool enabled)
     ble_flash_data.forceBle = enabled;
 
     // Save it in flash memory.
-    Runtime.storage().put(flash_base_addr, ble_flash_data);
-    Runtime.storage().commit();
+    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+    kaleidoscope::Runtime.storage().commit();
 }
 
 void BleManager::set_bt_name_from_specifications(const char *spec)
@@ -613,14 +604,14 @@ void BleManager::run()
     else if (activated_advertising && ble_is_idle())
     {
         activated_advertising = false;
-        plugin::LEDControl::disable();
+        kaleidoscope::plugin::LEDControl::disable();
         Communications_protocol::Packet p{};
         p.header.command = Communications_protocol::SLEEP;
         Communications.sendPacket(p);
     }
 
     // Reconection of side
-    if (!activated_advertising && ble_is_idle() && plugin::LEDControl::isEnabled())
+    if (!activated_advertising && ble_is_idle() && kaleidoscope::plugin::LEDControl::isEnabled())
     {
         ble_goto_advertising_mode();
         ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
@@ -656,7 +647,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     {
         if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && FirmwareVersion::keyboard_is_wireless())
         {
-            auto const &keyScanner = Runtime.device().keyScanner();
+            auto const &keyScanner = kaleidoscope::Runtime.device().keyScanner();
             auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
             auto isDefyRightWired = keyScanner.rightSideWiredConnection();
             auto isWiredMode = isDefyLeftWired || isDefyRightWired;
@@ -666,8 +657,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                 ble_flash_data.forceBle = true;
 
                 // Save it in flash memory.
-                Runtime.storage().put(flash_base_addr, ble_flash_data);
-                Runtime.storage().commit();
+                kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+                kaleidoscope::Runtime.storage().commit();
 
                 set_pairing_key_press(true);
 
@@ -740,7 +731,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         ble_goto_advertising_mode();
         ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
-        plugin::LEDControl::enable();
+        kaleidoscope::plugin::LEDControl::enable();
     }
 
     if (show_bt_layer)
@@ -826,8 +817,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                     delay(200);
 
                     // Save it in flash memory.
-                    Runtime.storage().put(flash_base_addr, ble_flash_data);
-                    Runtime.storage().commit();
+                    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
+                    kaleidoscope::Runtime.storage().commit();
                     /*
                         In this case, the data need to be saved instantly and not when
                         run_update_periodically() is executed.
@@ -962,8 +953,6 @@ const kbdif_handlers_t BleManager::kbdif_handlers =
     .key_event_cb = kbdif_key_event_cb,
     .command_event_cb = kbdif_command_event_cb,
 };
-
-} //  namespace kaleidoscope
 
 
 class BleManager BleManager;

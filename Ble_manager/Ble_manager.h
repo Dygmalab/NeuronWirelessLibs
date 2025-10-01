@@ -20,17 +20,8 @@
 
 #pragma once
 
-#include "Colormap-Defy.h"
-#include "kaleidoscope/Runtime.h"
-#include "kaleidoscope/plugin/FocusSerial.h"
-#include <Arduino.h>
-#include <Kaleidoscope-EEPROM-Settings.h>
-#include <Kaleidoscope-Ranges.h>
-
+#include "Ble_composite_dev.h"
 #include "kbd_if.h"
-
-namespace kaleidoscope
-{
 
 #define BLE_CONNECTIONS_COUNT   5
 #define BLE_ADDRESS_LEN         6
@@ -206,7 +197,5 @@ class BleManager
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 };
-
-} // namespace kaleidoscope
 
 extern class BleManager BleManager;
