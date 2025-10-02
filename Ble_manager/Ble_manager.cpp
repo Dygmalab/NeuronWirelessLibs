@@ -642,6 +642,8 @@ _EXIT:
 
 kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
 {
+    kbdapi_event_result_t result = KBDAPI_EVENT_RESULT_IGNORED;
+
     /* Exit conditions. */
     if (!ble_innited())
     {
@@ -724,8 +726,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         return KBDAPI_EVENT_RESULT_CONSUMED;
     }
 
-    kbdapi_event_result_t result = KBDAPI_EVENT_RESULT_IGNORED;
-
     if (ble_is_idle())
     {
         ble_goto_advertising_mode();
@@ -736,6 +736,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 
     if (show_bt_layer)
     {
+        result = KBDAPI_EVENT_RESULT_CONSUMED;
+
         if (((p_key->coord.col == 0 && p_key->coord.row == 0) || (p_key->coord.col == 9 && p_key->coord.row == 0)) && p_key->toggled_on)
         {
             reset_mcu();
@@ -766,7 +768,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                 // TODO: create a led effect to let the user know that the erease was successful
                 erase_paired_device(index_channel);
 
-                result = KBDAPI_EVENT_RESULT_CONSUMED;
             }
 
 #warning "Check if this actually works as this space is iffed with 'p_key->is_pressed'"
@@ -860,7 +861,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                         ble_goto_white_list_advertising_mode();
                     }
 
-                    result = KBDAPI_EVENT_RESULT_CONSUMED;
                 }
                 else if (ble_flash_data.currentChannel == index_channel && !ble_is_advertising_mode())
                 {
