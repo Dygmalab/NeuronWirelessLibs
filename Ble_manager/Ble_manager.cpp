@@ -753,8 +753,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
              (p_key->coord.col == 11 && p_key->coord.row == 1) || // U key
              (p_key->coord.col == 12 && p_key->coord.row == 1) || // I key
              (p_key->coord.col == 13 && p_key->coord.row == 1) || // O key
-             (p_key->coord.col == 14 && p_key->coord.row == 1))   // PT key
-            && p_key->is_pressed)
+             (p_key->coord.col == 14 && p_key->coord.row == 1)))  // PT key
         {
             set_channel_in_use( p_key );
             uint8_t index_channel = channel_in_use;
@@ -767,10 +766,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
             {
                 // TODO: create a led effect to let the user know that the erease was successful
                 erase_paired_device(index_channel);
-
             }
 
-#warning "Check if this actually works as this space is iffed with 'p_key->is_pressed'"
             if ( p_key->toggled_off )
             {
                 connectionState[index_channel].timePressed = 0;
