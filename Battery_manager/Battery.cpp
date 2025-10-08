@@ -39,7 +39,7 @@ namespace plugin
 
 #define EQUAL_STATE_COUNT 4
 #define DISCONNECT_GRACE_MS 3000
-#define DEBUG_LOG_BATTERY_MANAGER   1
+#define DEBUG_LOG_BATTERY_MANAGER   0
 
 
 uint8_t Battery::battery_level;
@@ -95,7 +95,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         if (::Focus.isEOL())
         {
 #if DEBUG_LOG_BATTERY_MANAGER
-            // NRF_LOG_DEBUG("read request: wireless.battery.right.level");
+            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
 #endif
             ::Focus.send(battery_level_right);
         }
@@ -146,7 +146,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         if (::Focus.isEOL())
         {
 #if DEBUG_LOG_BATTERY_MANAGER
-            // NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
+            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
 #endif
             ::Focus.send(saving_mode);
         }
@@ -154,7 +154,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         {
             ::Focus.read(saving_mode);
 #if DEBUG_LOG_BATTERY_MANAGER
-            // NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
+            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
 #endif
             Communications_protocol::Packet p{};
             p.header.command = Communications_protocol::BATTERY_SAVING;
@@ -259,7 +259,7 @@ EventHandlerResult Battery::onSetup()
         }
 
         #if DEBUG_LOG_BATTERY_MANAGER
-        // NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
+         NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
         #endif
     }));
 
@@ -283,16 +283,20 @@ EventHandlerResult Battery::onSetup()
         ble_battery_level_update(min(battery_level_left, battery_level_right));
 
         #if DEBUG_LOG_BATTERY_MANAGER
-        // NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
-        // packet.header.device,
-        // packet.data[0],
-        // battery_level_mv);
+        NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
+        packet.header.device,
+        packet.data[0],
+        battery_level_mv);
         #endif
     }));
 
     Communications.callbacks.bind(DISCONNECTED, ([this](Packet const &packet) 
     {
+        
+#if DEBUG_LOG_BATTERY_MANAGER
         NRF_LOG_DEBUG("DISCONNECTED RECEIVED, starting grace window");
+#endif
+
         if (filterHand(packet.header.device, false))
         {
             battery_level_left = 100;
