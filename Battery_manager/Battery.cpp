@@ -17,6 +17,8 @@
  * Author: Alejandro Parcet, @alexpargon
  *
  */
+#pragma GCC push_options
+#pragma GCC optimize("O0")
 
 #include "Battery.h"
 #include "Colormap-Defy.h"
@@ -35,8 +37,9 @@ namespace kaleidoscope
 namespace plugin
 {
 
-
-#define DEBUG_LOG_BATTERY_MANAGER   0
+#define EQUAL_STATE_COUNT 4
+#define DISCONNECT_GRACE_MS 3000
+#define DEBUG_LOG_BATTERY_MANAGER   1
 
 
 uint8_t Battery::battery_level;
@@ -46,6 +49,8 @@ uint8_t Battery::status_left = 4;
 uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
+Battery::bat_status_side_t Battery::right = {4 , 0,0,false,0,false};
+Battery::bat_status_side_t Battery::left = {4 , 0,0,false,0,false}; 
 
 
 EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
@@ -90,7 +95,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         if (::Focus.isEOL())
         {
 #if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
+            // NRF_LOG_DEBUG("read request: wireless.battery.right.level");
 #endif
             ::Focus.send(battery_level_right);
         }
@@ -111,6 +116,9 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
     {
         if (::Focus.isEOL())
         {
+            right.requestStatus();
+            right.last_status_packet_ms = Runtime.millisAtCycleStart();
+
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.right.status");
 #endif
@@ -122,9 +130,9 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
     {
         if (::Focus.isEOL())
         {
-            Communications_protocol::Packet p{};
-            p.header.command = Communications_protocol::BATTERY_STATUS;
-            Communications.sendPacket(p);
+
+            left.requestStatus();
+            left.last_status_packet_ms = Runtime.millisAtCycleStart();
 
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.left.status");
@@ -138,7 +146,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         if (::Focus.isEOL())
         {
 #if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
+            // NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
 #endif
             ::Focus.send(saving_mode);
         }
@@ -146,7 +154,7 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
         {
             ::Focus.read(saving_mode);
 #if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
+            // NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
 #endif
             Communications_protocol::Packet p{};
             p.header.command = Communications_protocol::BATTERY_SAVING;
@@ -159,6 +167,46 @@ EventHandlerResult Battery::onFocusEvent(const char *command)
     }
 
     return EventHandlerResult::EVENT_CONSUMED;
+}
+
+EventHandlerResult Battery::beforeReportingState()
+{
+    // Confirm pending DISCONNECTED only after grace period
+    uint32_t now = Runtime.millisAtCycleStart();
+
+    if (left.disconnect_pending && (now - left.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    {
+        status_left = 4;
+        left.cancelDisconnect();
+#if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery LEFT: disconnect grace elapsed -> status 4");
+#endif
+    }
+
+    if (right.disconnect_pending && (now - right.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    {
+        status_right = 4;
+        right.cancelDisconnect();
+#if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery RIGHT: disconnect grace elapsed -> status 4");
+#endif
+    }
+
+    if(left.status_requested && (now - left.last_status_packet_ms >= 1500))
+    {
+        left.last_status_packet_ms = Runtime.millisAtCycleStart();
+
+        /* We will send the BATTERY_STATUS command to both sides. 
+        * So we don't need to check if the right side has requested a status.
+        */
+        Communications_protocol::Packet p{};
+        p.header.command = Communications_protocol::BATTERY_STATUS;
+        Communications.sendPacket(p);
+
+        left.resetStatusRequested();
+    }
+
+    return EventHandlerResult::OK;
 }
 
 bool inline filterHand(Communications_protocol::Devices incomingDevice, bool right_or_left)
@@ -192,16 +240,26 @@ EventHandlerResult Battery::onSetup()
     Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
         if (filterHand(packet.header.device, false))
         {
-            status_left = packet.data[0];
+            // Any valid status from LEFT cancels a pending disconnect
+            if (left.disconnect_pending) { left.cancelDisconnect(); }
+            set_battery_status_left( packet.data[0]);
+            // Mark fresh status arrival for LEFT
+            left.last_status_packet_ms = Runtime.millisAtCycleStart();
+            if (left.status_requested) { left.resetStatusRequested(); }
         }
 
         if (filterHand(packet.header.device, true))
         {
-            status_right = packet.data[0];
+            // Any valid status from RIGHT cancels a pending disconnect
+            if (right.disconnect_pending) { right.cancelDisconnect(); }
+            set_battery_status_right(packet.data[0]);
+            // Mark fresh status arrival for RIGHT
+            right.last_status_packet_ms = Runtime.millisAtCycleStart();
+            if (right.status_requested) { right.resetStatusRequested(); }
         }
 
         #if DEBUG_LOG_BATTERY_MANAGER
-        NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
+        // NRF_LOG_DEBUG("Battery Status device %i %i", packet.header.device, packet.data[0]);
         #endif
     }));
 
@@ -209,11 +267,15 @@ EventHandlerResult Battery::onSetup()
         if (filterHand(packet.header.device, false))
         {
             battery_level_left = packet.data[0];
+            // Activity from LEFT side implies it's not disconnected anymore
+            if (left.disconnect_pending) { left.cancelDisconnect(); }
         }
 
         if (filterHand(packet.header.device, true))
         {
             battery_level_right = packet.data[0];
+            // Activity from RIGHT side implies it's not disconnected anymore
+            if (right.disconnect_pending) { right.cancelDisconnect(); }
         }
 
         uint16_t battery_level_mv;
@@ -221,24 +283,28 @@ EventHandlerResult Battery::onSetup()
         ble_battery_level_update(min(battery_level_left, battery_level_right));
 
         #if DEBUG_LOG_BATTERY_MANAGER
-        NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
-        packet.header.device,
-        packet.data[0],
-        battery_level_mv);
+        // NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
+        // packet.header.device,
+        // packet.data[0],
+        // battery_level_mv);
         #endif
     }));
 
-    Communications.callbacks.bind(DISCONNECTED, ([this](Packet const &packet) {
+    Communications.callbacks.bind(DISCONNECTED, ([this](Packet const &packet) 
+    {
+        NRF_LOG_DEBUG("DISCONNECTED RECEIVED, starting grace window");
         if (filterHand(packet.header.device, false))
         {
             battery_level_left = 100;
-            status_left = 4;
+            left.reset();
+            left.startDisconnect(Runtime.millisAtCycleStart());
         }
 
         if (filterHand(packet.header.device, true))
         {
             battery_level_right = 100;
-            status_right = 4;
+            right.reset();
+            right.startDisconnect(Runtime.millisAtCycleStart());
         }
 
         ble_battery_level_update(min(battery_level_left, battery_level_right));
@@ -276,7 +342,49 @@ uint8_t Battery::get_battery_status_right(void)
     return status_right;
 }
 
+void Battery::set_battery_status_left(uint8_t battery_status)
+{
+    // Implement confirmation algorithm: only change battery status after receiving same value twice
+    if (battery_status == static_cast<uint8_t>(left.last_status_received)) 
+    {
+        left.status_confirm_count++;
+        if ( left.status_confirm_count >= EQUAL_STATE_COUNT)
+        {
+          status_left = battery_status;
+          left.status_confirm_count = 0; // Reset counter after successful update
+        }
+    } 
+    else 
+    {
+    // Different status received, reset tracking
+    left.last_status_received = battery_status;
+    left.status_confirm_count = 0; // Start counting for new status
+    }
+}
+
+void Battery::set_battery_status_right(uint8_t battery_status)
+{
+    // Implement confirmation algorithm: only change battery status after receiving same value twice
+    if (battery_status == static_cast<uint8_t>(right.last_status_received)) 
+    {
+        right.status_confirm_count++;
+        if (right.status_confirm_count >= EQUAL_STATE_COUNT)
+        {
+          status_right = battery_status;
+          right.status_confirm_count = 0; // Reset counter after successful update
+        }
+      } 
+      else 
+      {
+        // Different status received, reset tracking
+        right.last_status_received = battery_status;
+        right.status_confirm_count = 1; // Start counting for new status
+      }
+}
+
 } // namespace plugin
 } //  namespace kaleidoscope
 
 kaleidoscope::plugin::Battery Battery;
+
+#pragma GCC pop_options
