@@ -22,6 +22,7 @@
 #include "Colormap-Defy.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
+#include "LEDManager.h"
 #include "FirmwareVersion.h"
 
 #include "Do_once.h"
@@ -91,8 +92,8 @@ result_t BleManager::init()
     NRF_LOG_DEBUG("Ble_manager: %i channels in total.", i);
 #endif
 
-    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-    ledBluetoothPairingDefy.setEreaseDone(false);
+    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+    LEDBluetoothPairingDefy.setEreaseDone(false);
 
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_FLUSH();
@@ -443,15 +444,15 @@ void BleManager::erase_paired_device(uint8_t index_channel)
 
         if (index_channel == ble_flash_data.currentChannel)
         {
-            ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+            LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
             ble_disconnect();
             // We could remove this reset but a weird led effect happends when the channel is the same
             reset_mcu();
         }
 
-        ledBluetoothPairingDefy.setEreaseDone(true);
+        LEDBluetoothPairingDefy.setEreaseDone(true);
         send_led_mode(); // this is to update the led effect.
-        ledBluetoothPairingDefy.setEreaseDone(false);
+        LEDBluetoothPairingDefy.setEreaseDone(false);
     }
 }
 
@@ -466,8 +467,8 @@ void BleManager::exit_pairing_mode(void)
     kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          false,
                                          true);
-    ::LEDControl.set_force_mode(false);
-    ::LEDControl.set_mode(0); // Disable LED fade effect.
+    LEDManager.led_effect_reset_prio();
+    LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
 }
 
 void BleManager::set_paired_channel_led(uint8_t channel, bool turnOn)
@@ -482,13 +483,12 @@ void BleManager::set_paired_channel_led(uint8_t channel, bool turnOn)
         channels &= ~(1 << bitPosition); // Establece el bit en la channel 3 en 0
     }
 
-    ledBluetoothPairingDefy.setPairedChannels(channels);
+    LEDBluetoothPairingDefy.setPairedChannels(channels);
 }
 
 void BleManager::send_led_mode(void)
 {
-    ::LEDControl.set_mode(10);
-    ::LEDControl.set_force_mode(true);
+    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
     kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
                                          true,
                                          false);
@@ -580,7 +580,7 @@ void BleManager::run()
             NRF_LOG_FLUSH();
 #endif
 
-            ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+            LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
             show_bt_layer = true;
             send_led_mode();
             activated_advertising = true;
@@ -590,8 +590,8 @@ void BleManager::run()
     {
         if ( activated_advertising )
         {
-            ledBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
-            ledBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
+            LEDBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
+            LEDBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
             set_paired_channel_led(ble_flash_data.currentChannel, true);
             send_led_mode();
             ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
@@ -614,7 +614,7 @@ void BleManager::run()
     if (!activated_advertising && ble_is_idle() && kaleidoscope::plugin::LEDControl::isEnabled())
     {
         ble_goto_advertising_mode();
-        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
     }
 }
@@ -729,7 +729,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     if (ble_is_idle())
     {
         ble_goto_advertising_mode();
-        ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
         kaleidoscope::plugin::LEDControl::enable();
     }
@@ -805,8 +805,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 #endif
 
                     ble_flash_data.currentChannel = index_channel;
-                    ledBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-                    ledBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+                    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+                    LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
                     send_led_mode();
                     update_channel_and_name();
 
