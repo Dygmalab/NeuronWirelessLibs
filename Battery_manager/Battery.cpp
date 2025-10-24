@@ -19,7 +19,6 @@
  */
 
 #include "Battery.h"
-#include "Colormap-Defy.h"
 #include "Communications.h"
 #include "Kaleidoscope-FocusSerial.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
@@ -195,12 +194,12 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
     if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
     {
         LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
-        kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true, true );
     }
 
     if ( p_key->toggled_off == true )
     {
-        kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false, true );
         LEDManager.led_effect_reset_prio();
         LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT );
     }

@@ -19,7 +19,6 @@
  */
 
 #include "Ble_manager.h"
-#include "Colormap-Defy.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 #include "LEDManager.h"
@@ -27,6 +26,9 @@
 
 #include "Do_once.h"
 #include "kbd_if_manager.h"
+
+#warning "Temporary use of LEDControlDygma outside of the kaleidoscope_adapter"
+#include "LEDControlDygma.h"
 
 
 void device_name_evt_handler(void);
@@ -464,9 +466,7 @@ void BleManager::exit_pairing_mode(void)
 #endif
 
     show_bt_layer = false;
-    kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
-                                         false,
-                                         true);
+    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false, true );
     LEDManager.led_effect_reset_prio();
     LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
 }
@@ -489,9 +489,7 @@ void BleManager::set_paired_channel_led(uint8_t channel, bool turnOn)
 void BleManager::send_led_mode(void)
 {
     LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
-    kaleidoscope::plugin::ColormapEffectDefy::updateBrigthness(kaleidoscope::plugin::ColormapEffectDefy::LedBrightnessControlEffect::BT_LED_EFFECT,
-                                         true,
-                                         false);
+    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, true, false);
 }
 
 void BleManager::set_channel_in_use( kbdapi_key_t * p_key )
