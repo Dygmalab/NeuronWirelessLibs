@@ -71,6 +71,18 @@ class EEPROMClass
             return t;
         }
 
+        bool get( int const address, void * p_target, uint32_t len )
+        {
+            if ( address < 0 || address + len > _size )
+            {
+                return false;
+            }
+
+            memcpy( p_target, _data + address, len );
+
+            return true;
+        }
+
         template<typename T>
         const T &put(int const address, const T &t)
         {
@@ -86,6 +98,22 @@ class EEPROMClass
             }
 
             return t;
+        }
+
+        bool put( int const address, void * p_source, uint32_t len )
+        {
+            if (address < 0 || address + len > _size)
+            {
+                return false;
+            }
+
+            if (memcmp(_data + address, (const uint8_t *)p_source, len) != 0)
+            {
+                _dirty = true;
+                memcpy(_data + address, (const uint8_t *)p_source, len);
+            }
+
+            return true;
         }
 
         template<typename T>
