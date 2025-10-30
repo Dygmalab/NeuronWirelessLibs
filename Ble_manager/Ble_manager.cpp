@@ -609,7 +609,7 @@ void BleManager::run()
     }
 
     // Reconection of side
-    if (!activated_advertising && ble_is_idle() && kaleidoscope::plugin::LEDControl::isEnabled())
+    if (!activated_advertising && ble_is_idle() && LEDManager.leds_enabled())
     {
         ble_goto_advertising_mode();
         LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
