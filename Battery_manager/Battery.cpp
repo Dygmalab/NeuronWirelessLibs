@@ -194,12 +194,12 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
     if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
     {
         LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
-        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true, true );
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true );
     }
 
     if ( p_key->toggled_off == true )
     {
-        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false, true );
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false );
         LEDManager.led_effect_reset_prio();
         LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT );
     }
