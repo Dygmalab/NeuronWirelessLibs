@@ -462,6 +462,11 @@ bool BleManager::get_pairing_key_press(void)
     return pairing_key_press;
 }
 
+bool BleManager::is_mitm_active(void)
+{
+    return mitm_activated;
+}
+
 EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
     /* Exit conditions. */
