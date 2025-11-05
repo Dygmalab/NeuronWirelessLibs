@@ -27,10 +27,6 @@
 #include "Do_once.h"
 #include "kbd_if_manager.h"
 
-#warning "Temporary use of LEDControlDygma outside of the kaleidoscope_adapter"
-#include "LEDControlDygma.h"
-
-
 void device_name_evt_handler(void);
 
 #define BLE_MANAGER_DEBUG_LOG   1
@@ -602,7 +598,7 @@ void BleManager::run()
     else if (activated_advertising && ble_is_idle())
     {
         activated_advertising = false;
-        kaleidoscope::plugin::LEDControl::disable();
+        LEDManager.leds_disable();
         Communications_protocol::Packet p{};
         p.header.command = Communications_protocol::SLEEP;
         Communications.sendPacket(p);
@@ -729,7 +725,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         ble_goto_advertising_mode();
         LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
         send_led_mode();
-        kaleidoscope::plugin::LEDControl::enable();
+        LEDManager.leds_enable();
     }
 
     if (show_bt_layer)
