@@ -212,6 +212,7 @@ static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
 void EEPROMClass::begin(size_t size)
 {
     nrf_fstorage_api_t *fs_api;
+    size_t size_align;
 
 #ifdef SOFTDEVICE_PRESENT
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
@@ -237,31 +238,34 @@ void EEPROMClass::begin(size_t size)
         size = FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE;
     }
 
-    _size = (size + 255) & (~255); // Flash writes limited to 256 byte boundaries
+    size_align = (size + 255) & (~255); // Flash writes limited to 256 byte boundaries
 
     // In case begin() is called a 2nd+ time, don't reallocate if size is the same
-    if (_data && size != _size)
+    if (_data && size_align > _size)
     {
+        _size = size_align;
+
         delete[] _data;
-        _data = new uint8_t[size];
+        _data = new uint8_t[_size];
 
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", size);
+        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", _size);
         NRF_LOG_FLUSH();
 #endif
     }
     else if (!_data)
     {
-        _data = new uint8_t[size];
+        _size = size_align;
+        _data = new uint8_t[_size];
 
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", size);
+        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", _size);
         NRF_LOG_FLUSH();
 #endif
     }
 
     // At startup, EEPROMclass loads all the flash memory pages it uses.
-    ret_code_t ret_code = nrf_fstorage_read(&fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR, _data, size);
+    ret_code_t ret_code = nrf_fstorage_read(&fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR, _data, _size);
 #if FLASH_STORAGE_DEBUG_READ
     NRF_LOG_DEBUG("EEPROM: Loaded flash memory, ret_code = %i", ret_code);
     NRF_LOG_FLUSH();
