@@ -462,7 +462,6 @@ bool BleManager::get_pairing_key_press(void)
     return pairing_key_press;
 }
 
-
 EventHandlerResult BleManager::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
 {
     /* Exit conditions. */
