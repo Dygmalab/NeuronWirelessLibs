@@ -124,8 +124,7 @@ class BleManager : public Plugin
 
     void set_pairing_key_press(bool press);
     bool get_pairing_key_press(void);
-    
-    bool is_mitm_active(void);
+
 
     void send_led_mode(void);
   private:
