@@ -17,8 +17,6 @@
  * Author: Alejandro Parcet, @alexpargon
  *
  */
-#pragma GCC push_options
-#pragma GCC optimize("O0")
 
 #include "Battery.h"
 #include "Colormap-Defy.h"
@@ -390,5 +388,3 @@ void Battery::set_battery_status_right(uint8_t battery_status)
 } //  namespace kaleidoscope
 
 kaleidoscope::plugin::Battery Battery;
-
-#pragma GCC pop_options
