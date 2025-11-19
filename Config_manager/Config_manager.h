@@ -31,8 +31,9 @@ class ConfigManager
 
         typedef enum
         {
-            CFG_ITEM_TYPE_LEDS_FADE_EFFECT = 1,
+            CFG_ITEM_TYPE_LEDS_FADE_EFFECT = 10,
             CFG_ITEM_TYPE_LEDS_IDLELEDS,
+            CFG_ITEM_TYPE_LEDS_BRIGHTNESS,
         } cfg_item_type_t;
 
         typedef result_t (* cfg_item_request_cb)( cfg_item_type_t item_type, const void ** pp_item );
