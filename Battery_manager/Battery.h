@@ -34,9 +34,11 @@ class Battery {
     result_t kbdif_initialize(void);
 
    private:
-    static uint8_t battery_level;
-    static uint8_t saving_mode;
+
+    static const uint8_t * p_saving_mode_conf;
     static uint16_t settings_saving_;
+
+    static uint8_t battery_level;
     static uint8_t status_left;
     static uint8_t status_right;
     static uint8_t battery_level_left;
@@ -46,6 +48,8 @@ class Battery {
 
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
+
+    static void cfgmem_saving_mode_config_save( uint8_t saving_mode );
 };
 
 extern class Battery Battery;

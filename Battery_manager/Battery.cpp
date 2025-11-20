@@ -20,6 +20,7 @@
 
 #include "Battery.h"
 #include "Communications.h"
+#include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDManager.h"
@@ -33,10 +34,10 @@
 
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
+const uint8_t * Battery::p_saving_mode_conf = nullptr;
+uint16_t Battery::settings_saving_;
 
 uint8_t Battery::battery_level;
-uint8_t Battery::saving_mode;
-uint16_t Battery::settings_saving_;
 uint8_t Battery::status_left = 4;
 uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
@@ -63,17 +64,17 @@ result_t Battery::init()
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
-    // Save saving_mode variable in EEPROM
-    settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(saving_mode));
-    uint8_t saving;
-    kaleidoscope::Runtime.storage().get(settings_saving_, saving);
-    if (saving == 0xFF)
-    { // If is the first time we read from memory
-        saving_mode = 0;
-        kaleidoscope::Runtime.storage().put(settings_saving_, saving_mode); // Save default value 0.
-        kaleidoscope::Runtime.storage().commit();
+    /* Get the battery savings mode configuration */
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BAT_SAVING_MODE, (const void **)&p_saving_mode_conf );
+
+    /* Check if the config is cleared */
+    if( *p_saving_mode_conf == 0xFF )
+    {
+        cfgmem_saving_mode_config_save( 0 );
     }
-    kaleidoscope::Runtime.storage().get(settings_saving_, saving_mode); // safe get
+
+    // Save saving_mode variable in EEPROM
+    settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(uint8_t));
 
     Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
         if (filterHand(packet.header.device, false))
@@ -133,7 +134,7 @@ result_t Battery::init()
     Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {
         packet.header.command = BATTERY_SAVING;
         packet.header.size = 1;
-        packet.data[0] = saving_mode;
+        packet.data[0] = *p_saving_mode_conf;
         Communications.sendPacket(packet);
     }));
 
@@ -275,21 +276,24 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
 #endif
-            ::Focus.send(saving_mode);
+            ::Focus.send( *p_saving_mode_conf );
         }
         else
         {
+            uint8_t saving_mode;
+
             ::Focus.read(saving_mode);
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
 #endif
+
+            cfgmem_saving_mode_config_save( saving_mode );
+
             Communications_protocol::Packet p{};
             p.header.command = Communications_protocol::BATTERY_SAVING;
             p.header.size = 1;
-            p.data[0] = saving_mode;
+            p.data[0] = *p_saving_mode_conf;
             Communications.sendPacket(p);
-            kaleidoscope::Runtime.storage().put(settings_saving_, saving_mode);
-            kaleidoscope::Runtime.storage().commit();
         }
     }
 
@@ -302,5 +306,18 @@ const kbdif_handlers_t Battery::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
+/****************************************************/
+/*                   Config Memory                  */
+/****************************************************/
+
+void Battery::cfgmem_saving_mode_config_save( uint8_t saving_mode )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( p_saving_mode_conf, &saving_mode, sizeof( uint8_t) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
 
 class Battery Battery;
