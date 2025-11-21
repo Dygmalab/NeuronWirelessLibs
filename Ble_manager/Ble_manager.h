@@ -31,42 +31,42 @@ class Ble_connections
 {
   public:
 
-    void set_peer_id(uint16_t id)
-    {
-        peer_id = id;
-    }
-
-    uint16_t get_peer_id(void)
-    {
-        return peer_id;
-    }
-
-    void set_device_addr(uint8_t *addr, uint8_t addr_len)
-    {
-        memcpy((void *)device_address, (const void *)addr, addr_len);
-    }
-
-    uint8_t *get_device_addr(void)
-    {
-        return device_address;
-    }
-
-    void set_device_name(uint8_t *name, uint8_t len)
-    {
-        memcpy(device_name, name, len);
-    }
-
-    uint8_t *get_device_name_ptr(void)
-    {
-        return device_name;
-    }
-
-    void reset(void)
-    {
-        peer_id = 0xFFFF;
-        memset(device_address, 0xFF, BLE_ADDRESS_LEN);
-        memset(device_name, 0x00, BLE_DEVICE_NAME_LEN);
-    }
+//    void set_peer_id(uint16_t id)
+//    {
+//        peer_id = id;
+//    }
+//
+//    uint16_t get_peer_id(void)
+//    {
+//        return peer_id;
+//    }
+//
+//    void set_device_addr(uint8_t *addr, uint8_t addr_len)
+//    {
+//        memcpy((void *)device_address, (const void *)addr, addr_len);
+//    }
+//
+//    uint8_t *get_device_addr(void)
+//    {
+//        return device_address;
+//    }
+//
+//    void set_device_name(uint8_t *name, uint8_t len)
+//    {
+//        memcpy(device_name, name, len);
+//    }
+//
+//    uint8_t *get_device_name_ptr(void)
+//    {
+//        return device_name;
+//    }
+//
+//    void reset(void)
+//    {
+//        peer_id = 0xFFFF;
+//        memset(device_address, 0xFF, BLE_ADDRESS_LEN);
+//        memset(device_name, 0x00, BLE_DEVICE_NAME_LEN);
+//    }
 
   private:
     pm_peer_id_t peer_id = PM_PEER_ID_INVALID;  // 0xFFFF | libraries/SDK/nRF5_SDK_17.1.0_ddde560/components/ble/peer_manager/peer_manager_types.h;
@@ -82,21 +82,40 @@ class Ble_flash_data
     uint8_t currentChannel;
     bool forceBle;
 
-    void reset(void)
-    {
-        for (auto &item : ble_connections)
-        {
-            item.reset();
-        }
-
-        currentChannel = 0;
-        forceBle = false;
-        strcpy(keyb_ble_name, BLE_DEVICE_NAME);
-    }
+//    void reset(void)
+//    {
+//        for (auto &item : ble_connections)
+//        {
+//            item.reset();
+//        }
+//
+//        currentChannel = 0;
+//        forceBle = false;
+//        strcpy(keyb_ble_name, BLE_DEVICE_NAME);
+//    }
 };
 
 class BleManager
 {
+  public:
+    typedef char ble_name_t[BLE_DEVICE_NAME_LEN];
+    typedef uint8_t ble_address_t[BLE_ADDRESS_LEN];
+
+    typedef struct PACK
+    {
+        pm_peer_id_t peer_id;
+        ble_address_t device_address;
+        ble_name_t device_name;
+    } connection_t;
+
+    typedef struct PACK
+    {
+        connection_t cons[BLE_CONNECTIONS_COUNT];
+        ble_name_t keyb_ble_name;
+        uint8_t current_channel;
+        bool_t force_ble;
+    } connections_config_t;
+
   public:
     bool trigger_save_name_timer = false;
 
@@ -150,13 +169,16 @@ class BleManager
         uint64_t timePressed;
     };
     ConnectionKeyState connectionState[BLE_CONNECTIONS_COUNT];
+
+    const connections_config_t * p_connections_config = nullptr;
+
     uint16_t flash_base_addr = 0;
     Ble_flash_data ble_flash_data;
 
     const char *ble_device_name = nullptr;
     uint8_t channels = 0;
     uint8_t channel_in_use = NOT_CONNECTED;
-    bool show_bt_layer = false;
+    bool showing_bt_layer = false;
     bool mitm_activated = false;
     char encryption_pin_number[6] = {};
 
@@ -190,6 +212,19 @@ class BleManager
      * This method disables the breathe effect.
      */
     void exit_pairing_mode(void);
+
+    void cfgmem_ble_name_save( const ble_name_t name_config, const char * p_name );
+
+    void cfgmem_con_peer_id_save( const connection_t * p_connection, pm_peer_id_t peer_id );
+    void cfgmem_con_device_address_save( const connection_t * p_connection, ble_address_t device_address );
+    void cfgmem_con_device_name_save( const connection_t * p_connection, const char * p_device_name );
+
+    void cfgmem_keyb_ble_name_save( const char * p_keyb_ble_name );
+    void cfgmem_current_channel_save( uint8_t current_channel );
+    void cfgmem_force_ble_save( bool_t force_ble );
+
+    void cfgmem_connection_reset( const connection_t * p_connection );
+    void cfgmem_connections_config_reset();
 
   private:
     static const kbdif_handlers_t kbdif_handlers;

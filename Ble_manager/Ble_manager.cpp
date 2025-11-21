@@ -19,6 +19,7 @@
  */
 
 #include "Ble_manager.h"
+#include "Config_manager.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 #include "LEDManager.h"
@@ -43,30 +44,27 @@ result_t BleManager::init()
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
-    flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BLE_CONNECTIONS, (const void **)&p_connections_config );
+    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
-    kaleidoscope::Runtime.storage().get(flash_base_addr, ble_flash_data);
     // For now lest think that if this variable is invalid, restart everything.
-    if (ble_flash_data.currentChannel == 0xFF)
+    if( p_connections_config->current_channel == 0xFF )
     {
-        ble_flash_data.reset();
-
-        // Save it in flash memory.
-        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-        kaleidoscope::Runtime.storage().commit();
+        cfgmem_connections_config_reset();
     }
 
+    flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
+
 #if BLE_MANAGER_DEBUG_LOG
-    NRF_LOG_DEBUG("Ble_manager: Current channel %i", ble_flash_data.currentChannel);
+    NRF_LOG_DEBUG("Ble_manager: Current channel %i", p_connections_config->current_channel);
 #endif
 
-    kaleidoscope::Runtime.storage().get(flash_base_addr, ble_flash_data);
     update_channel_and_name();
     // UX STUFFf
     i = 0;
-    for (auto &item : ble_flash_data.ble_connections) // get all the paired devices and store in a variable.
+    for (auto &item : p_connections_config->cons) // get all the paired devices and store in a variable.
     {
-        if (item.get_peer_id() == PM_PEER_ID_INVALID)
+        if (item.peer_id == PM_PEER_ID_INVALID)
         {
             set_paired_channel_led(i, false); // set channel related bit to 0
 
@@ -124,10 +122,10 @@ void BleManager::enable(void)
     for (uint32_t i = 0; i < peerCount; i++)
     {
         bool found = false;
-        for (auto &paired_device : ble_flash_data.ble_connections)
+        for (auto &paired_device : p_connections_config->cons)
         {
             if (peer_list[i] != PM_PEER_ID_INVALID &&
-                peer_list[i] == paired_device.get_peer_id())
+                peer_list[i] == paired_device.peer_id)
             {
                 found = true;
                 break;
@@ -137,16 +135,13 @@ void BleManager::enable(void)
         if (!found)
         {
             // Take the first invalid and set it has valid
-            for (auto &paired_device : ble_flash_data.ble_connections)
+            for (auto &paired_device : p_connections_config->cons)
             {
-                if (paired_device.get_peer_id() == PM_PEER_ID_INVALID)
+                if (paired_device.peer_id == PM_PEER_ID_INVALID)
                 {
-                    paired_device.reset();
-                    paired_device.set_peer_id(peer_list[i]);
-
-                    // Save it in flash memory.
-                    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-                    kaleidoscope::Runtime.storage().commit();
+                    /* Reset the connection in the memory with the new peer id */
+                    cfgmem_connection_reset( &paired_device );
+                    cfgmem_con_peer_id_save( &paired_device, peer_list[i] );
 
                     break;
                 }
@@ -155,13 +150,13 @@ void BleManager::enable(void)
     }
 
     // For all devices in the flash storage check if exist in the FDS
-    for (auto &paired_device : ble_flash_data.ble_connections)
+    for (auto &paired_device : p_connections_config->cons)
     {
         bool found = false;
         for (uint32_t i = 0; i < peerCount; i++)
         {
             if (peer_list[i] != PM_PEER_ID_INVALID &&
-                peer_list[i] == paired_device.get_peer_id())
+                peer_list[i] == paired_device.peer_id)
             {
                 found = true;
                 break;
@@ -170,32 +165,26 @@ void BleManager::enable(void)
 
         if (!found)
         {
-            paired_device.reset();
-
-            // Save it in flash memory.
-            kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-            kaleidoscope::Runtime.storage().commit();
+            /* Reset the connection in the memory */
+            cfgmem_connection_reset( &paired_device );
         }
     }
 }
 
 void BleManager::update_channel_and_name(void)
 {
-    set_current_channel(ble_flash_data.currentChannel);
+    set_current_channel(p_connections_config->current_channel);
 
     if (ble_device_name != nullptr)
     {
-        set_device_name(ble_device_name);
-
-        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-        kaleidoscope::Runtime.storage().commit();
+        set_device_name( ble_device_name );
     }
     else
     {
-        set_device_name(ble_flash_data.keyb_ble_name);
+        set_device_name( p_connections_config->keyb_ble_name );
     }
 
-    pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
+    pm_peer_id_t active_connection_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
 
     /*
         If it doesn't have any device on the channel, it goes into advertising mode with a white
@@ -253,7 +242,7 @@ void BleManager::timer_save_conn_run(uint32_t timeout_ms)
 
 void BleManager::save_connection(void)
 {
-    uint8_t *previous_dev_addr = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_device_addr();
+    const uint8_t * previous_dev_addr = p_connections_config->cons[p_connections_config->current_channel].device_address;
 
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_DEBUG("Ble_manager: previous_dev_addr = %02X %02X %02X %02X %02X %02X",
@@ -268,7 +257,7 @@ void BleManager::save_connection(void)
                   get_connected_device_address()[4], get_connected_device_address()[5]);
 #endif
 
-    uint16_t previous_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
+    uint16_t previous_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
 
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_DEBUG("Ble_manager: previous_peer_id = %i", previous_peer_id);
@@ -279,18 +268,13 @@ void BleManager::save_connection(void)
     if ( (memcmp(previous_dev_addr, get_connected_device_address(), BLE_ADDRESS_LEN) != 0) ||
         (previous_peer_id != get_connected_peer_id()) )
     {
-        // Change it in RAM.
-        ble_flash_data.ble_connections[ble_flash_data.currentChannel].set_device_addr(get_connected_device_address(),
-                                                                                      BLE_ADDRESS_LEN);
-        ble_flash_data.ble_connections[ble_flash_data.currentChannel].set_peer_id(get_connected_peer_id());
+        // Save new connection in the memory.
+        cfgmem_con_device_address_save( &p_connections_config->cons[p_connections_config->current_channel], get_connected_device_address( ) );
+        cfgmem_con_peer_id_save( &p_connections_config->cons[p_connections_config->current_channel], get_connected_peer_id( ) );
 
-        // Save it in flash memory.
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Saving new connection...");
 #endif
-
-        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-        kaleidoscope::Runtime.storage().commit();
     }
 }
 
@@ -330,7 +314,7 @@ void BleManager::timer_save_name_run(uint32_t timeout_ms)
 
 void BleManager::save_device_name(void)
 {
-    uint8_t *previous_dev_name = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_device_name_ptr();
+    const char * previous_dev_name = p_connections_config->cons[p_connections_config->current_channel].device_name;
 
 #if BLE_MANAGER_DEBUG_LOG
     uint8_t empty[BLE_DEVICE_NAME_LEN] = {};  // Init all with 0.
@@ -349,17 +333,13 @@ void BleManager::save_device_name(void)
     // It only saves it, if it is different from the previous one.
     if (memcmp(previous_dev_name, get_connected_device_name_ptr(), BLE_DEVICE_NAME_LEN) != 0)
     {
-        // Change it in RAM.
-        ble_flash_data.ble_connections[ble_flash_data.currentChannel].set_device_name(get_connected_device_name_ptr(),
-                                                                                            BLE_DEVICE_NAME_LEN);
+        // Save the new device name in the memory.
+        cfgmem_con_device_name_save( &p_connections_config->cons[p_connections_config->current_channel], (char *)get_connected_device_name_ptr() );
 
         // Save it in flash memory.
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Saving device name...");
 #endif
-
-        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-        kaleidoscope::Runtime.storage().commit();
     }
 }
 
@@ -411,7 +391,7 @@ char BleManager::raw_key_to_ascii( kbdapi_key_t * p_key )
 
 void BleManager::erase_paired_device(uint8_t index_channel)
 {
-    if (ble_flash_data.ble_connections[index_channel].get_peer_id() != PM_PEER_ID_INVALID)
+    if ( p_connections_config->cons[index_channel].peer_id != PM_PEER_ID_INVALID)
     {
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Deleting paired device on channel %i...", index_channel);
@@ -427,20 +407,18 @@ void BleManager::erase_paired_device(uint8_t index_channel)
 
         for (uint8_t i = 0; i < peerCount; ++i)
         {
-            if (peer_list[i] != PM_PEER_ID_INVALID && peer_list[i] == ble_flash_data.ble_connections[index_channel].get_peer_id())
+            if (peer_list[i] != PM_PEER_ID_INVALID && peer_list[i] == p_connections_config->cons[index_channel].peer_id)
             {
-                delete_peer_by_id(ble_flash_data.ble_connections[index_channel].get_peer_id());
+                delete_peer_by_id(p_connections_config->cons[index_channel].peer_id);
             }
         }
 
-        ble_flash_data.ble_connections[index_channel].reset();
+        /* Reset the connection in the memory */
+        cfgmem_connection_reset( &p_connections_config->cons[index_channel] );
+
         set_paired_channel_led(index_channel, false); // set channel related bit to 0
 
-        // Save it in flash memory.
-        kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-        kaleidoscope::Runtime.storage().commit();
-
-        if (index_channel == ble_flash_data.currentChannel)
+        if (index_channel == p_connections_config->current_channel)
         {
             LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
             ble_disconnect();
@@ -461,7 +439,7 @@ void BleManager::exit_pairing_mode(void)
     NRF_LOG_FLUSH();
 #endif
 
-    show_bt_layer = false;
+    showing_bt_layer = false;
     LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
     LEDManager.led_effect_reset_prio();
     LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
@@ -484,7 +462,16 @@ void BleManager::set_paired_channel_led(uint8_t channel, bool turnOn)
 
 void BleManager::send_led_mode(void)
 {
-    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+    if( showing_bt_layer == false)
+    {
+        LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+        showing_bt_layer = true;
+    }
+    else
+    {
+        LEDManager.led_effect_refresh();
+    }
+
     LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, true );
 }
 
@@ -513,16 +500,12 @@ void BleManager::set_channel_in_use( kbdapi_key_t * p_key )
 
 bool BleManager::getForceBle(void)
 {
-    return ble_flash_data.forceBle;
+    return p_connections_config->force_ble;
 }
 
 void BleManager::setForceBle(bool enabled)
 {
-    ble_flash_data.forceBle = enabled;
-
-    // Save it in flash memory.
-    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-    kaleidoscope::Runtime.storage().commit();
+    cfgmem_force_ble_save( enabled );
 }
 
 void BleManager::set_bt_name_from_specifications(const char *spec)
@@ -550,7 +533,6 @@ void BleManager::run()
     {
         mitm_activated = false;
         send_led_mode(); // If enters pin number fails, returns to advertising led mode layer.
-        show_bt_layer = true;
         clear_flag_security_proc_failed();
     }
 
@@ -570,12 +552,11 @@ void BleManager::run()
             // set_pairing_led_effect();
 
 #if BLE_MANAGER_DEBUG_LOG
-            NRF_LOG_DEBUG("Ble_manager: Channel %i, advertising mode.", ble_flash_data.currentChannel);
+            NRF_LOG_DEBUG("Ble_manager: Channel %i, advertising mode.", p_connections_config->current_channel);
             NRF_LOG_FLUSH();
 #endif
 
-            LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
-            show_bt_layer = true;
+            LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
             send_led_mode();
             activated_advertising = true;
         }
@@ -584,9 +565,9 @@ void BleManager::run()
     {
         if ( activated_advertising )
         {
-            LEDBluetoothPairingDefy.setConnectedChannel(ble_flash_data.currentChannel);
+            LEDBluetoothPairingDefy.setConnectedChannel(p_connections_config->current_channel);
             LEDBluetoothPairingDefy.setAvertisingModeOn(NOT_ON_ADVERTISING);
-            set_paired_channel_led(ble_flash_data.currentChannel, true);
+            set_paired_channel_led(p_connections_config->current_channel, true);
             send_led_mode();
             ble_get_device_name(device_name_evt_handler);  // Asynchronous call to the softdevice.
             activated_advertising = false;
@@ -608,7 +589,7 @@ void BleManager::run()
     if (!activated_advertising && ble_is_idle() && LEDManager.leds_enabled())
     {
         ble_goto_advertising_mode();
-        LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
         send_led_mode();
     }
 }
@@ -650,11 +631,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 
             if (isWiredMode)
             {
-                ble_flash_data.forceBle = true;
-
-                // Save it in flash memory.
-                kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-                kaleidoscope::Runtime.storage().commit();
+                cfgmem_force_ble_save( true );
 
                 set_pairing_key_press(true);
 
@@ -705,7 +682,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         return KBDAPI_EVENT_RESULT_CONSUMED;
     }
 
-    if ( !ble_is_advertising_mode() && show_bt_layer && p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
+    if ( !ble_is_advertising_mode() && showing_bt_layer && p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
     {
         exit_pairing_mode();
 
@@ -715,7 +692,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     if ( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
     {
         send_led_mode();
-        show_bt_layer = true;
 
         return KBDAPI_EVENT_RESULT_CONSUMED;
     }
@@ -723,12 +699,12 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
     if (ble_is_idle())
     {
         ble_goto_advertising_mode();
-        LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+        LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
         send_led_mode();
         LEDManager.leds_enable();
     }
 
-    if (show_bt_layer)
+    if (showing_bt_layer)
     {
         result = KBDAPI_EVENT_RESULT_CONSUMED;
 
@@ -792,15 +768,15 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
             if ( p_key->toggled_off )
             {
                 // NRF_LOG_DEBUG(" ble_is_advertising_mode(): %i", ble_is_advertising_mode());
-                if (ble_flash_data.currentChannel != index_channel)
+                if (p_connections_config->current_channel != index_channel)
                 {
 #if BLE_MANAGER_DEBUG_LOG
-                    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", ble_flash_data.currentChannel, index_channel);
+                    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", p_connections_config->current_channel, index_channel);
 #endif
 
-                    ble_flash_data.currentChannel = index_channel;
+                    cfgmem_current_channel_save( index_channel );
                     LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-                    LEDBluetoothPairingDefy.setAvertisingModeOn(ble_flash_data.currentChannel);
+                    LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
                     send_led_mode();
                     update_channel_and_name();
 
@@ -808,14 +784,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                     ble_adv_stop();
                     delay(200);
 
-                    // Save it in flash memory.
-                    kaleidoscope::Runtime.storage().put(flash_base_addr, ble_flash_data);
-                    kaleidoscope::Runtime.storage().commit();
-                    /*
-                        In this case, the data need to be saved instantly and not when
-                        run_update_periodically() is executed.
-                    */
-                    EEPROM.update();
+                    // Save it in flash memory - In this case, the data need to be saved instantly and not when the standard save timeout expires
+                    ConfigManager.config_save_now();
 
                     update_current_channel();
                     delay(200);
@@ -836,7 +806,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                         If it doesn't have any device paired on the channel, it goes into
                         advertising with a whitelist so that any device can find it.
                     */
-                    pm_peer_id_t active_connection_peer_id = ble_flash_data.ble_connections[ble_flash_data.currentChannel].get_peer_id();
+                    pm_peer_id_t active_connection_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
                     if (active_connection_peer_id == PM_PEER_ID_INVALID)
                     {
 #if BLE_MANAGER_DEBUG_LOG
@@ -853,7 +823,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                     }
 
                 }
-                else if (ble_flash_data.currentChannel == index_channel && !ble_is_advertising_mode())
+                else if (p_connections_config->current_channel == index_channel && !ble_is_advertising_mode())
                 {
                     exit_pairing_mode();
                 }
@@ -945,9 +915,104 @@ const kbdif_handlers_t BleManager::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
+/****************************************************/
+/*                   Config Memory                  */
+/****************************************************/
+
+void BleManager::cfgmem_ble_name_save( const ble_name_t name_config, const char * p_name )
+{
+    result_t result = RESULT_ERR;
+    ble_name_t ble_name;
+
+    ASSERT_DYGMA( strlen(p_name) < (sizeof(ble_name) - 1), "The new BLE name exceeds the available space" );
+
+    /* Fill the name cache. We use the cache to make sure the space in memory has always the same structure - filling the trailing space with 0x00 */
+    memset( ble_name, 0x00, sizeof(ble_name) );
+    strcpy( ble_name, p_name );
+
+    result = ConfigManager.config_item_update( name_config, ble_name, sizeof(ble_name_t) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+void BleManager::cfgmem_con_peer_id_save( const connection_t * p_connection, pm_peer_id_t peer_id )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_connection->peer_id, &peer_id, sizeof( p_connection->peer_id ) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+void BleManager::cfgmem_con_device_address_save( const connection_t * p_connection, ble_address_t device_address )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( p_connection->device_address, device_address, sizeof( p_connection->device_address ) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+void BleManager::cfgmem_con_device_name_save( const connection_t * p_connection, const char * p_device_name )
+{
+    cfgmem_ble_name_save( p_connection->device_name, p_device_name );
+}
+
+void BleManager::cfgmem_keyb_ble_name_save( const char * p_keyb_ble_name )
+{
+    cfgmem_ble_name_save( p_connections_config->keyb_ble_name, p_keyb_ble_name );
+}
+
+void BleManager::cfgmem_current_channel_save( uint8_t current_channel )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_connections_config->current_channel, &current_channel, sizeof( p_connections_config->current_channel) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+void BleManager::cfgmem_force_ble_save( bool_t force_ble )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_connections_config->force_ble, &force_ble, sizeof( p_connections_config->force_ble) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+void BleManager::cfgmem_connection_reset( const connection_t * p_connection )
+{
+    ble_address_t default_device_address;
+    ble_name_t default_device_name;
+
+    memset( default_device_address, 0xFF, sizeof(default_device_address) );
+    memset( default_device_name, 0x00, sizeof(default_device_name) );
+
+    cfgmem_con_peer_id_save( p_connection, PM_PEER_ID_INVALID );
+    cfgmem_con_device_address_save( p_connection, default_device_address );
+    cfgmem_con_device_name_save( p_connection, default_device_name );
+}
+
+void BleManager::cfgmem_connections_config_reset()
+{
+    uint8_t i;
+    for( i = 0; i < BLE_CONNECTIONS_COUNT; i++)
+    {
+        cfgmem_connection_reset( &p_connections_config->cons[i] );
+    }
+
+    cfgmem_keyb_ble_name_save( BLE_DEVICE_NAME );
+    cfgmem_current_channel_save( 0 );
+    cfgmem_force_ble_save( false );
+}
 
 class BleManager BleManager;
-
 
 void device_name_evt_handler(void)
 {
