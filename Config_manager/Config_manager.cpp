@@ -93,6 +93,21 @@ void ConfigManager::config_save( void )
     UNUSED( res );
 }
 
+void ConfigManager::config_save_now( void )
+{
+    /* Check if the configuration has changed and thus it makes sense to perform the save */
+    if( config_save_requested == false )
+    {
+        return;
+    }
+
+    /* Clear the flag */
+    config_save_requested = false;
+
+    /* Trigger the config save in the EEPROM */
+    config_save();
+}
+
 /********************************************/
 /*           Keyboard API memory            */
 /********************************************/
