@@ -23,6 +23,20 @@
 #include "kbd_if.h"
 
 class RadioManager {
+
+  public:
+    typedef enum : uint8_t
+    {
+        LOW_P,
+        MEDIUM_P,
+        HIGH_P,
+    } rf_power_t;
+
+    typedef struct PACK
+    {
+        rf_power_t rf_power;
+    } rf_config_t;
+
   public:
 
     result_t init();
@@ -38,20 +52,18 @@ class RadioManager {
 
   private:
 
-    enum Power :uint8_t {
-         LOW_P,
-         MEDIUM_P,
-         HIGH_P,
-     };
+    static const rf_config_t * p_rf_config;
+
     static bool inited;
     static uint16_t channel_hop;
-    static Power power_rf;
     static uint16_t settings_base_;
     static void setPowerRF();
 
     static const kbdif_handlers_t kbdif_handlers;
 
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
+
+    static void cfgmem_rf_power_save( rf_power_t rf_power );
 };
 
 extern class RadioManager RadioManager;

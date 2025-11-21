@@ -20,15 +20,16 @@
 
 #include "Radio_manager.h"
 #include "Communications.h"
+#include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
 #include "Kaleidoscope-EEPROM-Settings.h"
 #include "rf_host_device_api.h"
 
 #include "kbd_if_manager.h"
 
+const RadioManager::rf_config_t * RadioManager::p_rf_config = nullptr;
 uint16_t RadioManager::settings_base_ = 0;
 bool RadioManager::inited = false;
-RadioManager::Power RadioManager::power_rf = LOW_P;
 uint16_t RadioManager::channel_hop;
 
 result_t RadioManager::init()
@@ -38,14 +39,16 @@ result_t RadioManager::init()
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
-    settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(power_rf));
-    kaleidoscope::Runtime.storage().get(settings_base_, power_rf);
-    if (power_rf == 0xFF)
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_RF, (const void **)&p_rf_config );
+    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+
+    /* Check if the config is cleared */
+    if( p_rf_config->rf_power == 0xFF )
     {
-        power_rf = LOW_P;
-        kaleidoscope::Runtime.storage().put(settings_base_, power_rf);
-        kaleidoscope::Runtime.storage().commit();
+        cfgmem_rf_power_save( LOW_P );
     }
+
+    settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(uint8_t));
 
 _EXIT:
     return result;
@@ -67,7 +70,7 @@ void RadioManager::enable()
 void RadioManager::setPowerRF()
 {
     if (!inited) return;
-    switch (power_rf)
+    switch (p_rf_config->rf_power)
     {
         case LOW_P:
             rfgw_tx_power_set(RFGW_TX_POWER_0_DBM);
@@ -77,6 +80,9 @@ void RadioManager::setPowerRF()
             break;
         case HIGH_P:
             rfgw_tx_power_set(RFGW_TX_POWER_8_DBM);
+            break;
+        default:
+            ASSERT_DYGMA( false, "Invalid RF power option" );
             break;
     }
 }
@@ -130,18 +136,17 @@ kbdapi_event_result_t RadioManager::kbdif_command_event_cb( void * p_instance, c
         if (::Focus.isEOL())
         {
             NRF_LOG_DEBUG("read request: wireless.rf.power");
-            ::Focus.send<uint8_t>((uint8_t)power_rf);
+            ::Focus.send<uint8_t>((uint8_t)p_rf_config->rf_power);
         }
         else
         {
-            uint8_t power;
-            ::Focus.read(power);
-            if (power <= HIGH_P)
+            uint8_t rf_power;
+            ::Focus.read(rf_power);
+            if (rf_power <= HIGH_P)
             {
-                power_rf = (RadioManager::Power)power;
+                cfgmem_rf_power_save( (rf_power_t)rf_power );
+
                 setPowerRF();
-                kaleidoscope::Runtime.storage().put(settings_base_, power_rf);
-                kaleidoscope::Runtime.storage().commit();
             }
         }
     }
@@ -182,5 +187,19 @@ const kbdif_handlers_t RadioManager::kbdif_handlers =
     .key_event_cb = NULL,
     .command_event_cb = kbdif_command_event_cb,
 };
+
+/****************************************************/
+/*                   Config Memory                  */
+/****************************************************/
+
+void RadioManager::cfgmem_rf_power_save( rf_power_t rf_power )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_rf_config->rf_power, &rf_power, sizeof( p_rf_config->rf_power) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
 
 class RadioManager RadioManager;
