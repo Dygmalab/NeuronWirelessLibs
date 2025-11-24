@@ -36,6 +36,7 @@ class ConfigManager
             CFG_ITEM_TYPE_LEDS_FADE_EFFECT = 10,
             CFG_ITEM_TYPE_LEDS_IDLELEDS,
             CFG_ITEM_TYPE_LEDS_BRIGHTNESS,
+            CFG_ITEM_TYPE_LEDS_PALETTE,
 
             CFG_ITEM_TYPE_BAT_SAVING_MODE = 20,
 
