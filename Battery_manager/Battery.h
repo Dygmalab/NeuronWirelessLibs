@@ -18,12 +18,14 @@
  *
  */
 #pragma once
+#include <cstdint>
 
 #include "kbd_if.h"
 
 class Battery {
    public:
     result_t init( void );
+    void run( void );
 
    public:
     static uint8_t get_battery_status_left(void);
@@ -36,6 +38,53 @@ class Battery {
    private:
 
     static const uint8_t * p_saving_mode_conf;
+
+    struct bat_status_side_t
+    {
+        uint8_t last_status_received;
+        uint8_t status_confirm_count;
+
+        // Debounce for DISCONNECTED (status 4)
+        uint32_t disconnect_grace_started_ms;
+        bool disconnect_pending;
+
+        uint32_t last_status_packet_ms;
+        bool status_requested;
+
+        void reset()
+        {
+            last_status_received = 4;
+            status_confirm_count = 0;
+            disconnect_pending = false;
+            disconnect_grace_started_ms = 0;
+            last_status_packet_ms = 0;
+        }
+
+        void startDisconnect(uint32_t now)
+        {
+            disconnect_pending = true;
+            disconnect_grace_started_ms = now;
+        }
+
+        void cancelDisconnect()
+        {
+            disconnect_pending = false;
+        }
+
+        void requestStatus()
+        {
+            status_requested = true;
+        }
+
+        void resetStatusRequested()
+        {
+            status_requested = false;
+        }
+    };
+
+    static void set_battery_status_left(uint8_t status);
+    static void set_battery_status_right(uint8_t status);
+
     static uint16_t settings_saving_;
 
     static uint8_t battery_level;
@@ -43,6 +92,9 @@ class Battery {
     static uint8_t status_right;
     static uint8_t battery_level_left;
     static uint8_t battery_level_right;
+
+    static bat_status_side_t right;
+    static bat_status_side_t left; 
 
     static const kbdif_handlers_t kbdif_handlers;
 
