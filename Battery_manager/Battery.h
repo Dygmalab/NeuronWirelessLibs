@@ -85,8 +85,6 @@ class Battery {
     static void set_battery_status_left(uint8_t status);
     static void set_battery_status_right(uint8_t status);
 
-    static uint16_t settings_saving_;
-
     static uint8_t battery_level;
     static uint8_t status_left;
     static uint8_t status_right;

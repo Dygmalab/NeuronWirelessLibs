@@ -22,13 +22,11 @@
 #include "Communications.h"
 #include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "Kaleidoscope-EEPROM-Settings.h"
 #include "rf_host_device_api.h"
 
 #include "kbd_if_manager.h"
 
 const RadioManager::rf_config_t * RadioManager::p_rf_config = nullptr;
-uint16_t RadioManager::settings_base_ = 0;
 bool RadioManager::inited = false;
 uint16_t RadioManager::channel_hop;
 
@@ -47,8 +45,6 @@ result_t RadioManager::init()
     {
         cfgmem_rf_power_save( LOW_P );
     }
-
-    settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(uint8_t));
 
 _EXIT:
     return result;

@@ -20,7 +20,7 @@
 
 #include "Ble_manager.h"
 #include "Config_manager.h"
-#include "Kaleidoscope-EEPROM-Settings.h"
+#include "kaleidoscope/Runtime.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 #include "LEDManager.h"
 #include "FirmwareVersion.h"
@@ -52,8 +52,6 @@ result_t BleManager::init()
     {
         cfgmem_connections_config_reset();
     }
-
-    flash_base_addr = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(ble_flash_data));
 
 #if BLE_MANAGER_DEBUG_LOG
     NRF_LOG_DEBUG("Ble_manager: Current channel %i", p_connections_config->current_channel);

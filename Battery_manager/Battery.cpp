@@ -22,7 +22,6 @@
 #include "Communications.h"
 #include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "Kaleidoscope-EEPROM-Settings.h"
 #include "LEDManager.h"
 #include "FirmwareVersion.h"
 
@@ -36,7 +35,6 @@
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
 const uint8_t * Battery::p_saving_mode_conf = nullptr;
-uint16_t Battery::settings_saving_;
 
 uint8_t Battery::battery_level;
 uint8_t Battery::status_left = 4;
@@ -75,9 +73,6 @@ result_t Battery::init()
     {
         cfgmem_saving_mode_config_save( 0 );
     }
-
-    // Save saving_mode variable in EEPROM
-    settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(uint8_t));
 
     Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
         if (filterHand(packet.header.device, false))

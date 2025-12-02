@@ -27,74 +27,6 @@
 #define BLE_ADDRESS_LEN         6
 #define BLE_DEVICE_NAME_LEN     32  // Same value as flag _BLE_DEVICE_NAME_LEN defined in the Ble_composite_dev.c file.
 
-class Ble_connections
-{
-  public:
-
-//    void set_peer_id(uint16_t id)
-//    {
-//        peer_id = id;
-//    }
-//
-//    uint16_t get_peer_id(void)
-//    {
-//        return peer_id;
-//    }
-//
-//    void set_device_addr(uint8_t *addr, uint8_t addr_len)
-//    {
-//        memcpy((void *)device_address, (const void *)addr, addr_len);
-//    }
-//
-//    uint8_t *get_device_addr(void)
-//    {
-//        return device_address;
-//    }
-//
-//    void set_device_name(uint8_t *name, uint8_t len)
-//    {
-//        memcpy(device_name, name, len);
-//    }
-//
-//    uint8_t *get_device_name_ptr(void)
-//    {
-//        return device_name;
-//    }
-//
-//    void reset(void)
-//    {
-//        peer_id = 0xFFFF;
-//        memset(device_address, 0xFF, BLE_ADDRESS_LEN);
-//        memset(device_name, 0x00, BLE_DEVICE_NAME_LEN);
-//    }
-
-  private:
-    pm_peer_id_t peer_id = PM_PEER_ID_INVALID;  // 0xFFFF | libraries/SDK/nRF5_SDK_17.1.0_ddde560/components/ble/peer_manager/peer_manager_types.h;
-    uint8_t device_address[BLE_ADDRESS_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    uint8_t device_name[BLE_DEVICE_NAME_LEN] = {};
-};
-
-class Ble_flash_data
-{
-  public:
-    Ble_connections ble_connections[BLE_CONNECTIONS_COUNT];
-    char keyb_ble_name[BLE_DEVICE_NAME_LEN];
-    uint8_t currentChannel;
-    bool forceBle;
-
-//    void reset(void)
-//    {
-//        for (auto &item : ble_connections)
-//        {
-//            item.reset();
-//        }
-//
-//        currentChannel = 0;
-//        forceBle = false;
-//        strcpy(keyb_ble_name, BLE_DEVICE_NAME);
-//    }
-};
-
 class BleManager
 {
   public:
@@ -171,9 +103,6 @@ class BleManager
     ConnectionKeyState connectionState[BLE_CONNECTIONS_COUNT];
 
     const connections_config_t * p_connections_config = nullptr;
-
-    uint16_t flash_base_addr = 0;
-    Ble_flash_data ble_flash_data;
 
     const char *ble_device_name = nullptr;
     uint8_t channels = 0;

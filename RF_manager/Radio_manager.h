@@ -56,7 +56,6 @@ class RadioManager {
 
     static bool inited;
     static uint16_t channel_hop;
-    static uint16_t settings_base_;
     static void setPowerRF();
 
     static const kbdif_handlers_t kbdif_handlers;
