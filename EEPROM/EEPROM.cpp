@@ -115,6 +115,7 @@ extern "C"
 #define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
 #define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
 
+#define FLASH_STORAGE_ALIGN                     4       /* The FLASH data is aligned by 4 bytes */
 
 volatile static bool flag_write_completed = false;
 volatile static bool flag_erase_completed = false;
@@ -243,6 +244,11 @@ result_t EEPROMClass::init( void )
     initialized = true;
 
     return RESULT_OK;
+}
+
+uint32_t EEPROMClass::align_get(void)
+{
+    return FLASH_STORAGE_ALIGN;
 }
 
 result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_size )

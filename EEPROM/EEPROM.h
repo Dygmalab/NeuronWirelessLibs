@@ -34,6 +34,7 @@ class EEPROMClass
 {
     public:
         result_t init( void );
+        uint32_t align_get(void);
 
         result_t read( uint32_t addr_offset, uint8_t * p_data, size_t data_size );
         result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );

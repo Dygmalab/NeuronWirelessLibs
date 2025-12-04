@@ -230,6 +230,13 @@ result_t ConfigManager::init( const ConfigManager_config_t * p_config )
 {
     result_t result = RESULT_ERR;
 
+    /* Check the cache alignment */
+    if( (p_config->config_cache_size % EEPROM.align_get()) != 0 )
+    {
+        ASSERT_DYGMA( false, "The configuration cache is not aligned" );
+        return RESULT_ERR;
+    }
+
     /* Save the configuration cache */
     p_cache = p_config->p_config_cache;
     cache_size = p_config->config_cache_size;
