@@ -60,7 +60,7 @@ class ConfigManager
 
     public:
 
-        void init( const ConfigManager_config_t * p_config );
+        result_t init( const ConfigManager_config_t * p_config );
 
         result_t config_item_request( cfg_item_type_t item_type, const void ** pp_item );
         result_t config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size );
@@ -81,7 +81,7 @@ class ConfigManager
 
         void config_load( void );
         void config_save_request( void );
-        void config_save( void );
+        result_t config_save( void );
 
         /********************************************/
         /*           Keyboard API memory            */

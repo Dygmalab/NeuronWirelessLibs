@@ -28,9 +28,7 @@
 
 #include "EEPROM.h"
 
-#include "kaleidoscope/Runtime.h"
 #include "Arduino.h"
-#include "nrf_delay.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -41,16 +39,13 @@ extern "C"
 
 #ifdef SOFTDEVICE_PRESENT
 #include "nrf_fstorage_sd.h"
-#include "nrf_sdh.h"
-#include "nrf_sdh_ble.h"
 #else
-#include "nrf_drv_clock.h"
 #include "nrf_fstorage_nvmc.h"
 #endif
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
-#include "nrf_log_default_backends.h"
+//#include "nrf_log_default_backends.h"
 
 #ifdef __cplusplus
 }
@@ -115,6 +110,7 @@ extern "C"
 */
 #define FLASH_STORAGE_NUM_PAGES                 2
 #define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
+#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
 
 #define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
 #define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
@@ -160,12 +156,12 @@ static inline uint32_t flash_first_page_start_addr_get(void)
 
     uint32_t end_addr = (bootloader_addr != 0xFFFFFFFF) ? bootloader_addr : (code_sz * page_sz);
 
-    return end_addr - (FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE);
+    return end_addr - FLASH_STORAGE_SIZE;
 }
 
 static inline uint32_t flash_last_page_end_addr_get(void)
 {
-    return flash_first_page_start_addr_get() + (FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE) - 1;
+    return flash_first_page_start_addr_get() + FLASH_STORAGE_SIZE - 1;
 }
 
 static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
@@ -209,10 +205,15 @@ static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
     }
 }
 
-void EEPROMClass::begin(size_t size)
+result_t EEPROMClass::init( void )
 {
     nrf_fstorage_api_t *fs_api;
-    size_t size_align;
+
+    if( initialized == true )
+    {
+        /* The EEPROM is already initialized */
+        return RESULT_OK;
+    }
 
 #ifdef SOFTDEVICE_PRESENT
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
@@ -231,159 +232,71 @@ void EEPROMClass::begin(size_t size)
 #endif
 
     ret_code_t rc = nrf_fstorage_init(&fstorage_instance, fs_api, NULL);
+    if( rc != NRF_SUCCESS )
+    {
+        return RESULT_ERR;
+    }
     APP_ERROR_CHECK(rc);
 
-    if ((size <= 0) || (size > FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE))
+    /* Initially, the whole EEPROM space is protected and forcing the erase needs to be called before any write */
+    addr_offset_protected = FLASH_STORAGE_SIZE;
+    initialized = true;
+
+    return RESULT_OK;
+}
+
+result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_size )
+{
+    if (data_size == 0)
     {
-        size = FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE;
+        /* Nothing to read */
+        return RESULT_OK;
+    }
+    else if( addr_offset + data_size > FLASH_STORAGE_SIZE )
+    {
+        ASSERT_DYGMA(false, "EEPROM available space overflow");
+        return RESULT_ERR;
     }
 
-    size_align = (size + 255) & (~255); // Flash writes limited to 256 byte boundaries
-
-    // In case begin() is called a 2nd+ time, don't reallocate if size is the same
-    if (_data && size_align > _size)
+    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
     {
-        _size = size_align;
-
-        delete[] _data;
-        _data = new uint8_t[_size];
-
-#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", _size);
-        NRF_LOG_FLUSH();
-#endif
-    }
-    else if (!_data)
-    {
-        _size = size_align;
-        _data = new uint8_t[_size];
-
-#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-        NRF_LOG_DEBUG("EEPROM: Reserved %d Bytes.", _size);
-        NRF_LOG_FLUSH();
-#endif
+        yield();  // Meanwhile execute tasks.
     }
 
     // At startup, EEPROMclass loads all the flash memory pages it uses.
-    ret_code_t ret_code = nrf_fstorage_read(&fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR, _data, _size);
+    ret_code_t ret_code = nrf_fstorage_read( &fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, p_data, data_size );
+    if ( ret_code != NRF_SUCCESS )
+    {
+        return RESULT_ERR;
+    }
+
 #if FLASH_STORAGE_DEBUG_READ
     NRF_LOG_DEBUG("EEPROM: Loaded flash memory, ret_code = %i", ret_code);
     NRF_LOG_FLUSH();
 #endif
 
-    _dirty = false; // make sure dirty is cleared in case begin() is called 2nd+ time
+    return RESULT_OK;
 }
 
-bool EEPROMClass::end(void)
+result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size )
 {
-    bool retval;
-
-    if (!_size)
+    if (data_size == 0)
     {
-        return false;
+        /* Nothing to write */
+        return RESULT_OK;
+    }
+    else if( addr_offset < addr_offset_protected )
+    {
+        ASSERT_DYGMA(false, "Trying to write into protected EEPROM space");
+        return RESULT_ERR;
+    }
+    else if( addr_offset + data_size > FLASH_STORAGE_SIZE )
+    {
+        ASSERT_DYGMA(false, "EEPROM available space overflow");
+        return RESULT_ERR;
     }
 
-    retval = commit();
-    if (_data)
-    {
-        delete[] _data;
-    }
-    _data = 0;
-    _size = 0;
-    _dirty = false;
-
-    return retval;
-}
-
-uint8_t EEPROMClass::read(int const address)
-{
-    if (address < 0 || (size_t)address >= _size)
-    {
-        return 0;
-    }
-
-    if (!_data)
-    {
-        return 0;
-    }
-
-    return _data[address];
-}
-
-void EEPROMClass::write(int const address, uint8_t const value)
-{
-    if (address < 0 || (size_t)address >= _size)
-    {
-        return;
-    }
-
-    if (!_data)
-    {
-        return;
-    }
-
-    if (_data[address] != value)
-    {
-        _data[address] = value;
-        _dirty = true;  // Optimise _dirty. Only flagged if data written is different.
-    }
-}
-
-bool EEPROMClass::commit(void)
-{
-    if (!_size)
-    {
-        return false;
-    }
-
-    if (!_dirty)
-    {
-        return true;
-    }
-
-    if (!_data)
-    {
-        return false;
-    }
-
-    /*
-        Indicates that the buffer in RAM memory has new data that must be written to flash memory
-        the next time the Update() method is executed.
-    */
-    needUpdate = true;
-
-    /*
-        It resets the periodic update timer to give time for the application to perform all
-        the necessary writes, in case there are many, in RAM and then save them all
-        together with a single write to flash memory, automatically when this timer expires.
-    */
-    reset_timer_update_periodically();
-
-    return true;
-}
-
-uint8_t *EEPROMClass::getDataPtr(void)
-{
-    _dirty = true;
-
-    return &_data[0];
-}
-
-uint8_t const *EEPROMClass::getConstDataPtr(void) const
-{
-    return &_data[0];
-}
-
-void EEPROMClass::update(void)
-{
-    if (!needUpdate)
-    {
-        return;
-    }
-
-    erase();
-
-    while (nrf_fstorage_is_busy(NULL))  // Wait until fstorage is available.
+    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
     {
         yield();  // Meanwhile execute tasks.
     }
@@ -394,33 +307,11 @@ void EEPROMClass::update(void)
 #endif
     flag_write_completed = false;
     ret_code_t ret_code = nrf_fstorage_write(&fstorage_instance,
-                                             FLASH_STORAGE_FIRST_PAGE_START_ADDR,
-                                             _data,
-                                             _size,
+                                             FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset,
+                                             p_data,
+                                             data_size,
                                              NULL);
-    if (ret_code == NRF_SUCCESS)
-    {
-        /*
-            The operation was accepted.
-            Upon completion, the NRF_FSTORAGE_ERASE_RESULT event is sent to the callback function
-            registered by the instance.
-
-            If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
-        */
-        while (!flag_write_completed)
-        {
-            yield();  // Meanwhile execute tasks.
-        }
-        needUpdate = false;
-
-        /*
-            It resets the periodic update timer since we just wrote the flash memory.
-            This makes sense since the update() method can be called manually by the user, in addition
-            to being called all the time automatically by timer_update_periodically_run().
-        */
-        reset_timer_update_periodically();
-    }
-    else
+    if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Write error, ret_code = %d", ret_code);
         NRF_LOG_FLUSH();
@@ -436,12 +327,33 @@ void EEPROMClass::update(void)
             ret = 4  -> NRF_ERROR_NO_MEM: If no memory is available to accept the operation. When using the SoftDevice implementation, this error indicates that the
            internal queue of operations is full.
         */
+
+        flag_write_completed = true;
+
+        return RESULT_ERR;
     }
+
+    /*
+        The operation was accepted.
+        Upon completion, the NRF_FSTORAGE_ERASE_RESULT event is sent to the callback function
+        registered by the instance.
+
+        If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
+    */
+    while (!flag_write_completed)
+    {
+        yield();  // Meanwhile execute tasks.
+    }
+
+    /* Shift the protected address offset */
+    addr_offset_protected = addr_offset + data_size;
+
+    return RESULT_OK;
 }
 
-void EEPROMClass::erase(void)
+result_t EEPROMClass::erase(void)
 {
-    while (nrf_fstorage_is_busy(NULL))  // Wait until fstorage is available.
+    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
     {
         yield();  // Meanwhile execute tasks.
     }
@@ -455,76 +367,43 @@ void EEPROMClass::erase(void)
                                              FLASH_STORAGE_FIRST_PAGE_START_ADDR,
                                              FLASH_STORAGE_NUM_PAGES,
                                              NULL);
-    if (ret_code == NRF_SUCCESS)
+    if (ret_code != NRF_SUCCESS)
     {
+        NRF_LOG_ERROR("EEPROM: Erase error, ret_code = %lu", ret_code);
+        NRF_LOG_FLUSH();
+
         /*
-            The operation was accepted.
-            Upon completion, the NRF_FSTORAGE_ERASE_RESULT event is sent to the callback function
-            registered by the instance.
-
             If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
+
+            Error codes:
+            ret = 14 -> NRF_ERROR_NULL: If p_fs or p_src is NULL.
+            ret = 8  -> NRF_ERROR_INVALID_STATE: If the module is not initialized.
+            ret = 9  -> NRF_ERROR_INVALID_LENGTH: If len is zero or not a multiple of the program unit, or if it is otherwise invalid.
+            ret = 16 -> NRF_ERROR_INVALID_ADDR: If the address dest is outside the flash memory boundaries specified in p_fs, or if it is unaligned.
+            ret = 4  -> NRF_ERROR_NO_MEM: If no memory is available to accept the operation. When using the SoftDevice implementation, this error indicates that the
+           internal queue of operations is full.
         */
-        while (!flag_erase_completed)
-        {
-            yield();  // Meanwhile execute tasks.
-        }
 
-        return;
+        flag_erase_completed = true;
+
+        return RESULT_ERR;
     }
-
-    NRF_LOG_ERROR("EEPROM: Erase error, ret_code = %lu", ret_code);
-    NRF_LOG_FLUSH();
 
     /*
+        The operation was accepted.
+        Upon completion, the NRF_FSTORAGE_ERASE_RESULT event is sent to the callback function
+        registered by the instance.
+
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
-
-        Error codes:
-        ret = 14 -> NRF_ERROR_NULL: If p_fs or p_src is NULL.
-        ret = 8  -> NRF_ERROR_INVALID_STATE: If the module is not initialized.
-        ret = 9  -> NRF_ERROR_INVALID_LENGTH: If len is zero or not a multiple of the program unit, or if it is otherwise invalid.
-        ret = 16 -> NRF_ERROR_INVALID_ADDR: If the address dest is outside the flash memory boundaries specified in p_fs, or if it is unaligned.
-        ret = 4  -> NRF_ERROR_NO_MEM: If no memory is available to accept the operation. When using the SoftDevice implementation, this error indicates that the
-       internal queue of operations is full.
     */
-}
-
-bool EEPROMClass::getNeedUpdate(void)
-{
-    return needUpdate;
-}
-
-void EEPROMClass::timer_update_periodically_run(uint32_t timeout_ms)
-{
-    if (trigger_update_periodically_timer)
+    while (!flag_erase_completed)
     {
-        trigger_update_periodically_timer = false;
-        ti_periodically_update = kaleidoscope::Runtime.millisAtCycleStart();
+        yield();  // Meanwhile execute tasks.
     }
 
-    if (kaleidoscope::Runtime.hasTimeExpired(ti_periodically_update, timeout_ms))
-    {
-        if (EEPROM.getNeedUpdate())
-        {
-#if FLASH_STORAGE_DEBUG_WRITE
-            NRF_LOG_DEBUG("EEPROM: Flash updated automatically.");
-            NRF_LOG_FLUSH();
-#endif
-            EEPROM.update();
-        }
-//        else
-//        {
-//            NRF_LOG_DEBUG("flash not updated");
-//            NRF_LOG_FLUSH();
-//        }
+    addr_offset_protected = 0;
 
-        trigger_update_periodically_timer = true;
-    }
+    return RESULT_OK;
 }
-
-void EEPROMClass::reset_timer_update_periodically(void)
-{
-    ti_periodically_update = kaleidoscope::Runtime.millisAtCycleStart();
-}
-
 
 EEPROMClass EEPROM;

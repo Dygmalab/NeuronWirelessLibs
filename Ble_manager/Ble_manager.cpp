@@ -234,7 +234,6 @@ void BleManager::timer_save_conn_run(uint32_t timeout_ms)
         }
 
         // While this timer is running, the periodic update timer remains reset.
-        EEPROM.reset_timer_update_periodically();
     }
 }
 
@@ -306,7 +305,6 @@ void BleManager::timer_save_name_run(uint32_t timeout_ms)
         }
 
         // While this timer is running, the periodic update timer remains reset.
-        EEPROM.reset_timer_update_periodically();
     }
 }
 

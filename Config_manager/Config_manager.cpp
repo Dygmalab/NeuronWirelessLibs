@@ -66,12 +66,12 @@ result_t ConfigManager::config_item_update( const void * p_config_item, const vo
 
 void ConfigManager::config_load( void )
 {
-    bool_t res;
+    result_t result = RESULT_ERR;
 
-    res = EEPROM.get( 0, p_cache, cache_size );
-    ASSERT_DYGMA( res == true, "EEPROM.get failed" );
+    result = EEPROM.read( 0, p_cache, cache_size );
+    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.read failed" );
 
-    UNUSED( res );
+    UNUSED( result );
 }
 
 void ConfigManager::config_save_request( void )
@@ -80,21 +80,30 @@ void ConfigManager::config_save_request( void )
     timer_set_ms( &config_save_timer, CONFIG_SAVE_TIMEOUT_MS );
 }
 
-void ConfigManager::config_save( void )
+result_t ConfigManager::config_save( void )
 {
-    bool_t res;
+    result_t result = RESULT_ERR;
 
-    res = EEPROM.put( 0, p_cache, cache_size );
-    ASSERT_DYGMA( res == true, "EEPROM.put failed" );
+    result = EEPROM.erase();
+    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.erase failed" );
+    EXIT_IF_ERR( result, "EEPROM.erase failed" );
 
-    res = EEPROM.commit();
-    ASSERT_DYGMA( res == true, "EEPROM.commit failed" );
+    result = EEPROM.write( 0, p_cache, cache_size );
+    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.write failed" );
+    EXIT_IF_ERR( result, "EEPROM.write failed" );
 
-    UNUSED( res );
+_EXIT:
+    return result;
 }
 
 void ConfigManager::config_save_now( void )
 {
+    /* First, let the config machine finish its last operation */
+    while( machine_state != CONFIG_STATE_IDLE )
+    {
+        run();
+    }
+
     /* Check if the configuration has changed and thus it makes sense to perform the save */
     if( config_save_requested == false )
     {
@@ -177,9 +186,16 @@ INLINE void ConfigManager::machine_state_idle( void )
 
 INLINE void ConfigManager::machine_state_save( void )
 {
+    result_t result = RESULT_ERR;
+
     /* Update the brightness and return to the IDLE state */
-    config_save();
+    result = config_save();
+    EXIT_IF_NOK( result );
+
     machine_state_set( CONFIG_STATE_IDLE );
+
+_EXIT:
+    return;
 }
 
 INLINE void ConfigManager::machine( void )
@@ -210,8 +226,10 @@ INLINE void ConfigManager::machine( void )
 /*                   API                    */
 /********************************************/
 
-void ConfigManager::init( const ConfigManager_config_t * p_config )
+result_t ConfigManager::init( const ConfigManager_config_t * p_config )
 {
+    result_t result = RESULT_ERR;
+
     /* Save the configuration cache */
     p_cache = p_config->p_config_cache;
     cache_size = p_config->config_cache_size;
@@ -221,13 +239,17 @@ void ConfigManager::init( const ConfigManager_config_t * p_config )
     item_request_kbdmem_cb = p_config->item_request_kbdmem_cb;
 
     /* Initialize the EEPROM */
-    EEPROM.begin( cache_size );
+    result = EEPROM.init();
+    EXIT_IF_ERR( result, "EEPROM.init failed" );
 
     /* Get the config image */
     config_load();
 
     /* Initialize the keyboard API memory interface */
     kbdmem_ll_init();
+
+_EXIT:
+    return result;
 }
 
 void ConfigManager::run( void )

@@ -28,123 +28,20 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
+#include "middleware.h"
 
 class EEPROMClass
 {
     public:
-        void begin(size_t size);
-        bool end(void);
+        result_t init( void );
 
-        /*
-            Use of the class for storing data in flash memory:
-            - The put() and write() methods stores data in the internal RAM buffer of the EEPROMClass.
-            - The commit() method sets an internal flag indicating that the RAM buffer has changes
-              that need to be saved to the flash memory.
-            - The update() method writes the entire RAM buffer to the flash memory.
-        */
-        void write(int const address, uint8_t const val);
-        bool commit(void);
-        bool getNeedUpdate(void);
-        void update(void);
-        void timer_update_periodically_run(uint32_t timeout_ms);
-        void reset_timer_update_periodically(void);
-        uint8_t read(int const address);
+        result_t read( uint32_t addr_offset, uint8_t * p_data, size_t data_size );
+        result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
+        result_t erase(void);
 
-        void erase(void);
-        uint8_t *getDataPtr(void);
-        uint8_t const *getConstDataPtr(void) const;
-
-        template<typename T>
-        T &get(int const address, T &t)
-        {
-            if (address < 0 || address + sizeof(T) > _size)
-            {
-                return t;
-            }
-
-            memcpy((uint8_t *)&t, _data + address, sizeof(T));
-
-            return t;
-        }
-
-        bool get( int const address, void * p_target, uint32_t len )
-        {
-            if ( address < 0 || address + len > _size )
-            {
-                return false;
-            }
-
-            memcpy( p_target, _data + address, len );
-
-            return true;
-        }
-
-        template<typename T>
-        const T &put(int const address, const T &t)
-        {
-            if (address < 0 || address + sizeof(T) > _size)
-            {
-                return t;
-            }
-
-            if (memcmp(_data + address, (const uint8_t *)&t, sizeof(T)) != 0)
-            {
-                _dirty = true;
-                memcpy(_data + address, (const uint8_t *)&t, sizeof(T));
-            }
-
-            return t;
-        }
-
-        bool put( int const address, void * p_source, uint32_t len )
-        {
-            if (address < 0 || address + len > _size)
-            {
-                return false;
-            }
-
-            if (memcmp(_data + address, (const uint8_t *)p_source, len) != 0)
-            {
-                _dirty = true;
-                memcpy(_data + address, (const uint8_t *)p_source, len);
-            }
-
-            return true;
-        }
-
-        template<typename T>
-        const T &update(int const address, const T &t)
-        {
-            return put(address, t);
-        }
-
-        size_t length()
-        {
-            return _size;
-        }
-
-        uint8_t &operator[](int const address)
-        {
-            return getDataPtr()[address];
-        }
-
-        uint8_t const &operator[](int const address) const
-        {
-            return getConstDataPtr()[address];
-        }
-
-    protected:
-        uint8_t *_data = nullptr;
-        size_t _size = 0;
-        bool needUpdate = false;
-        bool _dirty = false;
-
-        bool trigger_update_periodically_timer = true;
-        uint32_t ti_periodically_update = 0;
+    private:
+        bool_t initialized = false;
+        uint32_t addr_offset_protected = 0;  /* Used to protect already written addresses to prevent multiple address writes */
 };
 
 extern EEPROMClass EEPROM;
