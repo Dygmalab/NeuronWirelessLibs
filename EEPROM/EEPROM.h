@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "middleware.h"
+#include "dl_middleware.h"
 
 class EEPROMClass
 {
