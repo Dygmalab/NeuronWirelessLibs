@@ -24,6 +24,12 @@
 
 class Battery {
    public:
+    typedef struct PACK
+    {
+        uint8_t saving_mode;;
+    } battery_conf_t;
+
+   public:
     result_t init( void );
     void run( void );
 
@@ -37,7 +43,7 @@ class Battery {
 
    private:
 
-    static const uint8_t * p_saving_mode_conf;
+    static const battery_conf_t * p_battery_conf;
 
     struct bat_status_side_t
     {

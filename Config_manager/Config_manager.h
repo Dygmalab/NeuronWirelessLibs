@@ -36,7 +36,7 @@ class ConfigManager
             CFG_ITEM_TYPE_LEDS_PALETTE,
             CFG_ITEM_TYPE_LEDS_COLORMAP,
 
-            CFG_ITEM_TYPE_BAT_SAVING_MODE = 20,
+            CFG_ITEM_TYPE_BATTERY = 20,
 
             CFG_ITEM_TYPE_BLE_CONNECTIONS = 30,
 

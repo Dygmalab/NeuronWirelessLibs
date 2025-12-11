@@ -34,7 +34,7 @@
 #define DISCONNECT_GRACE_MS 3000
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
-const uint8_t * Battery::p_saving_mode_conf = nullptr;
+const Battery::battery_conf_t * Battery::p_battery_conf = nullptr;
 
 uint8_t Battery::battery_level;
 uint8_t Battery::status_left = 4;
@@ -66,10 +66,11 @@ result_t Battery::init()
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
     /* Get the battery savings mode configuration */
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BAT_SAVING_MODE, (const void **)&p_saving_mode_conf );
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BATTERY, (const void **)&p_battery_conf );
+    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
     /* Check if the config is cleared */
-    if( *p_saving_mode_conf == 0xFF )
+    if( p_battery_conf->saving_mode == 0xFF )
     {
         cfgmem_saving_mode_config_save( 0 );
     }
@@ -154,7 +155,7 @@ result_t Battery::init()
     Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {
         packet.header.command = BATTERY_SAVING;
         packet.header.size = 1;
-        packet.data[0] = *p_saving_mode_conf;
+        packet.data[0] = p_battery_conf->saving_mode;
         Communications.sendPacket(packet);
     }));
 
@@ -376,7 +377,7 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
 #endif
-            ::Focus.send( *p_saving_mode_conf );
+            ::Focus.send( p_battery_conf->saving_mode );
         }
         else
         {
@@ -392,7 +393,7 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
             Communications_protocol::Packet p{};
             p.header.command = Communications_protocol::BATTERY_SAVING;
             p.header.size = 1;
-            p.data[0] = *p_saving_mode_conf;
+            p.data[0] = p_battery_conf->saving_mode;
             Communications.sendPacket(p);
         }
     }
@@ -414,7 +415,7 @@ void Battery::cfgmem_saving_mode_config_save( uint8_t saving_mode )
 {
     result_t result = RESULT_ERR;
 
-    result = ConfigManager.config_item_update( p_saving_mode_conf, &saving_mode, sizeof( uint8_t) );
+    result = ConfigManager.config_item_update( &p_battery_conf->saving_mode, &saving_mode, sizeof( p_battery_conf->saving_mode ) );
     ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
 
     UNUSED( result );
