@@ -31,6 +31,8 @@ using namespace Communications_protocol;
 
 // clang-format off
 
+#warning "All COMPILE_FOR_ macros need to be moved to the application level. Possibly common.h"
+
 // SPI0
 #if COMPILE_SPI0_SUPPORT
     #define PIN_MISO0         NRF_GPIO_PIN_MAP(, )
