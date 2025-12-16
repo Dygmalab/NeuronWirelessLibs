@@ -1,8 +1,7 @@
-
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,32 +21,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
- 
-#ifndef __HAL_LL_NRF528XX_H
-#define __HAL_LL_NRF528XX_H
 
-#include "hal/hal_config.h"
+#ifndef __HAL_LL_NRF52840_PRIVATE_H_
+#define __HAL_LL_NRF52840_PRIVATE_H_
 
-#if !defined( HAL_CFG_MCU_SERIES )
+#include "nrf52840_bitfields.h"
 
-    #define HAL_CFG_MCU_SERIES      HAL_MCU_SERIES_NRF52
+/**************************** Flash ****************************/
+#define NRF52_LL_FLASH_ADDRESS_MIN          0x00000000
+#define NRF52_LL_FLASH_ADDRESS_MAX          0x000FFFFF
 
-    #if HAL_CFG_MCU == HAL_MCU_NRF52833
-        #define HAL_MCU_LL_SPEC_LINK "hal/mcu/nrf52/nrf52833/hal_ll_nrf52833_private.h"
-    #elif HAL_CFG_MCU == HAL_MCU_NRF52840
-        #define HAL_MCU_LL_SPEC_LINK "hal/mcu/nrf52/nrf52840/hal_ll_nrf52840_private.h"
-    #else
-        #undef HAL_CFG_MCU_SERIES
-    #endif
-#endif /* HAL_CFG_MCU_SERIES */
+#define NRF52_LL_FLASH_SIZE                 (NRF52_LL_FLASH_ADDRESS_MAX - NRF52_LL_FLASH_ADDRESS_MIN + 1)
+#define NRF52_LL_FLASH_PAGE_SIZE            4096
 
-#if HAL_CFG_MCU_SERIES == HAL_MCU_SERIES_NRF52
+#define NRF52_LL_FLASH_ALIGN                4
+#define NRF52_LL_FLASH_ALIGN_MASK           0x00000003
 
-    #define HAL_MCU_LL_GPIO_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_gpio.h"
-    #define HAL_MCU_LL_MCU_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_mcu.h"
-    #define HAL_MCU_LL_MUTEX_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_mutex.h"
-    #define HAL_MCU_LL_SPI_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_spi.h"
+#define NRF52_LL_FLASH_ALIGN_REWRITE_MAX    2
 
-#endif /* HAL_CFG_MCU_SERIES */
-
-#endif /* __HAL_LL_NRF528XX_H */
+#endif /* __HAL_LL_NRF52840_PRIVATE_H_ */
