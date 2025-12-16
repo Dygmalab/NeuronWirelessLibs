@@ -88,10 +88,6 @@ extern "C" {
 #define SPI_DEBUG_PRINT_RX_PACKET       0
 #define NUM_BYTES_OF_RX_PACKET_TO_PRINT 8
 
-#define COMPILE_SPI0_SUPPORT            0
-#define COMPILE_SPI1_SUPPORT            1
-#define COMPILE_SPI2_SUPPORT            1
-
 #define SPI_SLAVE_PACKET_SIZE           sizeof(Communications_protocol::Packet)
 
 class Spi_slave {
