@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,28 @@
  * SOFTWARE.
  */
 
-#ifndef __UTILS_H_
-#define __UTILS_H_
+#include "dl_utils.h"
 
-#include "dl_middleware.h"
+uint32_t array_popcount_get( uint8_t * p_array, uint32_t array_len )
+{
+    uint32_t popcount = 0;
+    uint32_t i;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+    for( i = 0; i < array_len; i++ )
+    {
+        popcount += __builtin_popcount( p_array[i] );
+    }
 
-#ifndef DYGMA_CORE_UTILS_SPECIFIED
-#define DYGMA_CORE_UTILS_SPECIFIED
-
-#define _get_def( def, _defs, _def_type, _id, id ) { def = NULL; \
-    for ( size_t index = 0; index < sizeof( _defs ) / sizeof( _def_type ); ++index ) \
-    if ( _defs[ index ]._id == id ) { def = &_defs[ index ]; break; } }
-
-#endif /* DYGMA_CORE_UTILS_SPECIFIED */
-
-/* Read number of set bits in an uint8_t array */
-extern uint32_t array_popcount_get( uint8_t * p_array, uint32_t array_len );
-/* Read value of a bit in an uint8_t array */
-extern uint8_t array_bit_get( uint8_t * p_array, uint32_t array_len, uint32_t array_bit_pos );
-
-#ifdef __cplusplus
+    return popcount;
 }
-#endif
 
-#endif /* __UTILS_H_ */
+uint8_t array_bit_get( uint8_t * p_array, uint32_t array_len, uint32_t array_bit_pos )
+{
+    uint32_t byte_pos = array_bit_pos / array_len;
+    uint32_t bit_pos = array_bit_pos % array_len;
+
+    uint8_t byte = p_array[byte_pos];
+    uint8_t bit = ( byte >> bit_pos ) & 0x01;
+
+    return bit;
+}
