@@ -25,7 +25,7 @@
 
 #include "Arduino.h"
 
-#include "utils/mutex.h"
+#include "utils/dl_mutex.h"
 #include "spi_link_def.h"
 #include "spi_link_slave.h"
 

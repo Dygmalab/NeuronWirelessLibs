@@ -35,7 +35,7 @@ extern "C" {
 
 #include "memory/heap.h"
 #include "memory/link_list.h"
-#include "utils/utils.h"
+#include "utils/dl_utils.h"
 
 #include "utils/dl_crc32.h"
 
