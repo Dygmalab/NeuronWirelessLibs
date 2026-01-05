@@ -40,8 +40,8 @@ uint32_t array_popcount_get( uint8_t * p_array, uint32_t array_len )
 
 uint8_t array_bit_get( uint8_t * p_array, uint32_t array_len, uint32_t array_bit_pos )
 {
-    uint32_t byte_pos = array_bit_pos / array_len;
-    uint32_t bit_pos = array_bit_pos % array_len;
+    uint32_t byte_pos = array_bit_pos >> 3;         /* (array_bit_pos / 8) */
+    uint32_t bit_pos = array_bit_pos & 0x00000007;  /* (array_bit_pos % 8) */
 
     uint8_t byte = p_array[byte_pos];
     uint8_t bit = ( byte >> bit_pos ) & 0x01;
