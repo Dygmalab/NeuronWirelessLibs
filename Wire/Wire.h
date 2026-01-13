@@ -28,11 +28,6 @@
 #define TWI_DEBUG                   1
 #define TWI_PRINT_RECEIVED_BUFF     0
 
-
-#define TWI_SCL_PIN                 5
-#define TWI_SDA_PIN                 4
-
-
 class Wire
 {
   public:
