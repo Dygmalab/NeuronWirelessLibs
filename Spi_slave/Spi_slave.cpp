@@ -268,9 +268,7 @@ void Spi_slave::data_out_process( void )
     data_out_len = spi_tx_fifo.get( &spi_packet );
     ASSERT_DYGMA( data_out_len == sizeof( spi_packet ), "Failure: Empty Packet received from FIFO" );
 
-    // NOTE: Do NOT overwrite has_more_packets here - it's already set correctly by the upper layer
-    // The FIFO queue state doesn't reflect the logical packet sequence (e.g., multi-packet layers)
-    // spi_packet.header.has_more_packets = ( spi_tx_fifo.is_empty() == true ) ? false : true;
+    spi_packet.header.has_more_packets = ( spi_tx_fifo.is_empty() == true ) ? false : true;
     
     spi_packet.header.crc = 0;
     spi_packet.header.crc = crc8( spi_packet.buf, sizeof(Communications_protocol::Header) + spi_packet.header.size );
