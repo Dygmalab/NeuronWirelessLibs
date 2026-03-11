@@ -21,6 +21,7 @@
 #include "Ble_manager.h"
 #include "Config_manager.h"
 #include "kaleidoscope/Runtime.h"
+#include "keyboard_api.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 #include "LEDManager.h"
 #include "FirmwareVersion.h"
@@ -43,6 +44,9 @@ result_t BleManager::init()
 
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
+    result = kbdapi_key_report_lock_init( &kbdapi_key_report_lock );
+    EXIT_IF_ERR( result, "kbdapi_key_report_lock_init failed" );
 
     result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BLE_CONNECTIONS, (const void **)&p_connections_config );
     EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
@@ -428,6 +432,30 @@ void BleManager::erase_paired_device(uint8_t index_channel)
     }
 }
 
+void BleManager::bt_layer_enter(void)
+{
+    /* Start the Bluetooth led effect */
+    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+
+    /* Disable the keyboard key reporting */
+    kbdapi_key_report_disable( &kbdapi_key_report_lock );
+
+    showing_bt_layer = true;
+}
+
+void BleManager::bt_layer_exit(void)
+{
+    showing_bt_layer = false;
+
+    /* Exit the Bluetooth led effect */
+    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
+    LEDManager.led_effect_reset_prio();
+    LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
+
+    /* Re-enable the keyboard key reporting */
+    kbdapi_key_report_enable( &kbdapi_key_report_lock );
+}
+
 void BleManager::exit_pairing_mode(void)
 {
 #if BLE_MANAGER_DEBUG_LOG
@@ -435,10 +463,8 @@ void BleManager::exit_pairing_mode(void)
     NRF_LOG_FLUSH();
 #endif
 
-    showing_bt_layer = false;
-    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
-    LEDManager.led_effect_reset_prio();
-    LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
+    /* Exit the Bluetooth layer */
+    bt_layer_exit();
 }
 
 void BleManager::set_paired_channel_led(uint8_t channel, bool turnOn)
@@ -460,8 +486,7 @@ void BleManager::send_led_mode(void)
 {
     if( showing_bt_layer == false)
     {
-        LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
-        showing_bt_layer = true;
+        bt_layer_enter();
     }
     else
     {
@@ -692,6 +717,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
         return KBDAPI_EVENT_RESULT_CONSUMED;
     }
 
+    result = KBDAPI_EVENT_RESULT_IGNORED;
+
     if (ble_is_idle())
     {
         ble_goto_advertising_mode();
@@ -702,8 +729,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 
     if (showing_bt_layer)
     {
-        result = KBDAPI_EVENT_RESULT_CONSUMED;
-
         if (((p_key->coord.col == 0 && p_key->coord.row == 0) || (p_key->coord.col == 9 && p_key->coord.row == 0)) && p_key->toggled_on)
         {
             reset_mcu();
@@ -732,6 +757,8 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
             {
                 // TODO: create a led effect to let the user know that the erease was successful
                 erase_paired_device(index_channel);
+
+                result = KBDAPI_EVENT_RESULT_CONSUMED;
             }
 
             if ( p_key->toggled_off )
@@ -818,6 +845,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                         ble_goto_white_list_advertising_mode();
                     }
 
+                    result = KBDAPI_EVENT_RESULT_CONSUMED;
                 }
                 else if (p_connections_config->current_channel == index_channel && !ble_is_advertising_mode())
                 {

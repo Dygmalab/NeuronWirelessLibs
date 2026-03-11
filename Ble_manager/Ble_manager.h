@@ -22,6 +22,7 @@
 
 #include "Ble_composite_dev.h"
 #include "kbd_if.h"
+#include "keyboard_api.h"
 
 #define BLE_CONNECTIONS_COUNT   5
 #define BLE_ADDRESS_LEN         6
@@ -119,6 +120,7 @@ class BleManager
     uint32_t ti_save_new_name = 0;
 
     kbdif_t * p_kbdif = NULL;
+    kbdapi_key_report_lock_t kbdapi_key_report_lock;
 
     result_t kbdif_initialize(void);
     kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
@@ -136,6 +138,10 @@ class BleManager
     bool is_num_key(kbdapi_key_t * p_key);
     char raw_key_to_ascii(kbdapi_key_t * p_key);
     void update_channel_and_name(void);
+
+    void bt_layer_enter(void);
+    void bt_layer_exit(void);
+
     /*
      * Disables the advertising LED effect.
      * This method disables the breathe effect.
