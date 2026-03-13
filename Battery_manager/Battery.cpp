@@ -1,5 +1,5 @@
 /* -*- mode: c++ -*-
- * kaleidoscope::plugin::Battery_manager -- Manage battery levels and status in wireless devices
+ * Battery_manager -- Manage battery levels and status in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
@@ -19,193 +19,30 @@
  */
 
 #include "Battery.h"
-#include "Colormap-Defy.h"
 #include "Communications.h"
+#include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "kaleidoscope/key_events.h"
-#include "kaleidoscope/plugin/LEDControlDefy.h"
+#include "LEDManager.h"
 #include "FirmwareVersion.h"
+
+#include "kbd_if_manager.h"
 
 
 #define NOT_CHARGING 0
-
-
-namespace kaleidoscope
-{
-namespace plugin
-{
 
 #define EQUAL_STATE_COUNT 4
 #define DISCONNECT_GRACE_MS 3000
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
+const Battery::battery_conf_t * Battery::p_battery_conf = nullptr;
 
 uint8_t Battery::battery_level;
-uint8_t Battery::saving_mode;
-uint16_t Battery::settings_saving_;
 uint8_t Battery::status_left = 4;
 uint8_t Battery::status_right = 4;
 uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
 Battery::bat_status_side_t Battery::right = {4 , 0,0,false,0,false};
 Battery::bat_status_side_t Battery::left = {4 , 0,0,false,0,false}; 
-
-
-EventHandlerResult Battery::onKeyswitchEvent(Key &mappedKey, KeyAddr key_addr, uint8_t keyState)
-{
-    if (mappedKey.getRaw() != ranges::BATTERY_LEVEL )
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (keyToggledOn(keyState) &&  FirmwareVersion::keyboard_is_wireless())
-    {
-        ::LEDControl.set_mode(9);
-        ::LEDControl.set_force_mode(true);
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, true);
-    }
-
-    if (keyToggledOff(keyState))
-    {
-        ColormapEffectDefy::updateBrigthness(ColormapEffectDefy::LedBrightnessControlEffect::BATTERY_STATUS, false);
-        ::LEDControl.set_force_mode(false);
-        ::LEDControl.set_mode(0);
-    }
-
-    return EventHandlerResult::EVENT_CONSUMED;
-}
-
-EventHandlerResult Battery::onFocusEvent(const char *command)
-{
-    if (::Focus.handleHelp(command,
-        "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (strncmp(command, "wireless.battery.", 17) != 0)
-    {
-        return EventHandlerResult::OK;
-    }
-
-    if (strcmp(command + 17, "right.level") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
-#endif
-            ::Focus.send(battery_level_right);
-        }
-    }
-
-    if (strcmp(command + 17, "left.level") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.left.level");
-#endif
-            ::Focus.send(battery_level_left);
-        }
-    }
-
-    if (strcmp(command + 17, "right.status") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-            right.requestStatus();
-            right.last_status_packet_ms = Runtime.millisAtCycleStart();
-
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.right.status");
-#endif
-            ::Focus.send(status_right);
-        }
-    }
-
-    if (strcmp(command + 17, "left.status") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-
-            left.requestStatus();
-            left.last_status_packet_ms = Runtime.millisAtCycleStart();
-
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.left.status");
-#endif
-            ::Focus.send(status_left);
-        }
-    }
-
-    if (strcmp(command + 17, "savingMode") == 0)
-    {
-        if (::Focus.isEOL())
-        {
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
-#endif
-            ::Focus.send(saving_mode);
-        }
-        else
-        {
-            ::Focus.read(saving_mode);
-#if DEBUG_LOG_BATTERY_MANAGER
-            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
-#endif
-            Communications_protocol::Packet p{};
-            p.header.command = Communications_protocol::BATTERY_SAVING;
-            p.header.size = 1;
-            p.data[0] = saving_mode;
-            Communications.sendPacket(p);
-            Runtime.storage().put(settings_saving_, saving_mode);
-            Runtime.storage().commit();
-        }
-    }
-
-    return EventHandlerResult::EVENT_CONSUMED;
-}
-
-EventHandlerResult Battery::beforeReportingState()
-{
-    // Confirm pending DISCONNECTED only after grace period
-    uint32_t now = Runtime.millisAtCycleStart();
-
-    if (left.disconnect_pending && (now - left.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
-    {
-        status_left = 4;
-        left.cancelDisconnect();
-#if DEBUG_LOG_BATTERY_MANAGER
-        NRF_LOG_DEBUG("Battery LEFT: disconnect grace elapsed -> status 4");
-#endif
-    }
-
-    if (right.disconnect_pending && (now - right.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
-    {
-        status_right = 4;
-        right.cancelDisconnect();
-#if DEBUG_LOG_BATTERY_MANAGER
-        NRF_LOG_DEBUG("Battery RIGHT: disconnect grace elapsed -> status 4");
-#endif
-    }
-
-    if(left.status_requested && (now - left.last_status_packet_ms >= 1500))
-    {
-        left.last_status_packet_ms = Runtime.millisAtCycleStart();
-
-        /* We will send the BATTERY_STATUS command to both sides. 
-        * So we don't need to check if the right side has requested a status.
-        */
-        Communications_protocol::Packet p{};
-        p.header.command = Communications_protocol::BATTERY_STATUS;
-        Communications.sendPacket(p);
-
-        left.resetStatusRequested();
-    }
-
-    return EventHandlerResult::OK;
-}
 
 bool inline filterHand(Communications_protocol::Devices incomingDevice, bool right_or_left)
 {
@@ -221,19 +58,22 @@ bool inline filterHand(Communications_protocol::Devices incomingDevice, bool rig
     }
 }
 
-EventHandlerResult Battery::onSetup()
+result_t Battery::init()
 {
-    // Save saving_mode variable in EEPROM
-    settings_saving_ = ::EEPROMSettings.requestSlice(sizeof(saving_mode));
-    uint8_t saving;
-    Runtime.storage().get(settings_saving_, saving);
-    if (saving == 0xFF)
-    { // If is the first time we read from memory
-        saving_mode = 0;
-        Runtime.storage().put(settings_saving_, saving_mode); // Save default value 0.
-        Runtime.storage().commit();
+    result_t result = RESULT_ERR;
+
+    result = kbdif_initialize();
+    EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
+    /* Get the battery savings mode configuration */
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BATTERY, (const void **)&p_battery_conf );
+    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+
+    /* Check if the config is cleared */
+    if( p_battery_conf->saving_mode == 0xFF )
+    {
+        cfgmem_saving_mode_config_save( 0 );
     }
-    Runtime.storage().get(settings_saving_, saving_mode); // safe get
 
     Communications.callbacks.bind(BATTERY_STATUS, ([this](Packet const &packet) {
         if (filterHand(packet.header.device, false))
@@ -242,7 +82,7 @@ EventHandlerResult Battery::onSetup()
             if (left.disconnect_pending) { left.cancelDisconnect(); }
             set_battery_status_left( packet.data[0]);
             // Mark fresh status arrival for LEFT
-            left.last_status_packet_ms = Runtime.millisAtCycleStart();
+            left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
             if (left.status_requested) { left.resetStatusRequested(); }
         }
 
@@ -252,7 +92,7 @@ EventHandlerResult Battery::onSetup()
             if (right.disconnect_pending) { right.cancelDisconnect(); }
             set_battery_status_right(packet.data[0]);
             // Mark fresh status arrival for RIGHT
-            right.last_status_packet_ms = Runtime.millisAtCycleStart();
+            right.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
             if (right.status_requested) { right.resetStatusRequested(); }
         }
 
@@ -299,14 +139,14 @@ EventHandlerResult Battery::onSetup()
         {
             battery_level_left = 100;
             left.reset();
-            left.startDisconnect(Runtime.millisAtCycleStart());
+            left.startDisconnect(kaleidoscope::Runtime.millisAtCycleStart());
         }
 
         if (filterHand(packet.header.device, true))
         {
             battery_level_right = 100;
             right.reset();
-            right.startDisconnect(Runtime.millisAtCycleStart());
+            right.startDisconnect(kaleidoscope::Runtime.millisAtCycleStart());
         }
 
         ble_battery_level_update(min(battery_level_left, battery_level_right));
@@ -315,11 +155,12 @@ EventHandlerResult Battery::onSetup()
     Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {
         packet.header.command = BATTERY_SAVING;
         packet.header.size = 1;
-        packet.data[0] = saving_mode;
+        packet.data[0] = p_battery_conf->saving_mode;
         Communications.sendPacket(packet);
     }));
 
-    return EventHandlerResult::OK;
+_EXIT:
+    return result;
 }
 
 uint8_t Battery::get_battery_status_left(void)
@@ -384,7 +225,200 @@ void Battery::set_battery_status_right(uint8_t battery_status)
       }
 }
 
-} // namespace plugin
-} //  namespace kaleidoscope
+void Battery::run()
+{
+    // Confirm pending DISCONNECTED only after grace period
+    uint32_t now = kaleidoscope::Runtime.millisAtCycleStart();
 
-kaleidoscope::plugin::Battery Battery;
+    if (left.disconnect_pending && (now - left.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    {
+        status_left = 4;
+        left.cancelDisconnect();
+#if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery LEFT: disconnect grace elapsed -> status 4");
+#endif
+    }
+
+    if (right.disconnect_pending && (now - right.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    {
+        status_right = 4;
+        right.cancelDisconnect();
+#if DEBUG_LOG_BATTERY_MANAGER
+        NRF_LOG_DEBUG("Battery RIGHT: disconnect grace elapsed -> status 4");
+#endif
+    }
+
+    if(left.status_requested && (now - left.last_status_packet_ms >= 1500))
+    {
+        left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+
+        /* We will send the BATTERY_STATUS command to both sides.
+        * So we don't need to check if the right side has requested a status.
+        */
+        Communications_protocol::Packet p{};
+        p.header.command = Communications_protocol::BATTERY_STATUS;
+        Communications.sendPacket(p);
+
+        left.resetStatusRequested();
+    }
+}
+
+result_t Battery::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = this;
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
+}
+
+kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key )
+{
+    if ( p_key->type != KBDAPI_KEY_TYPE_BATTERY_LEVEL )
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
+    {
+        LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true );
+    }
+
+    if ( p_key->toggled_off == true )
+    {
+        LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false );
+        LEDManager.led_effect_reset_prio();
+        LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT );
+    }
+
+    return KBDAPI_EVENT_RESULT_CONSUMED;
+}
+
+kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const char * p_command )
+{
+    if (::Focus.handleHelp(p_command,
+        "wireless.battery.left.level\nwireless.battery.right.level\nwireless.battery.left.status\nwireless.battery.right.status\nwireless.battery.savingMode"))
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strncmp(p_command, "wireless.battery.", 17) != 0)
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strcmp(p_command + 17, "right.level") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.right.level");
+#endif
+            ::Focus.send(battery_level_right);
+        }
+    }
+
+    if (strcmp(p_command + 17, "left.level") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.left.level");
+#endif
+            ::Focus.send(battery_level_left);
+        }
+    }
+
+    if (strcmp(p_command + 17, "right.status") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+            right.requestStatus();
+            right.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.right.status");
+#endif
+            ::Focus.send(status_right);
+        }
+    }
+
+    if (strcmp(p_command + 17, "left.status") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+            left.requestStatus();
+            left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.left.status");
+#endif
+            ::Focus.send(status_left);
+        }
+    }
+
+    if (strcmp(p_command + 17, "savingMode") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("read request: wireless.battery.savingMode");
+#endif
+            ::Focus.send( p_battery_conf->saving_mode );
+        }
+        else
+        {
+            uint8_t saving_mode;
+
+            ::Focus.read(saving_mode);
+#if DEBUG_LOG_BATTERY_MANAGER
+            NRF_LOG_DEBUG("write request: wireless.battery.savingMode");
+#endif
+
+            cfgmem_saving_mode_config_save( saving_mode );
+
+            Communications_protocol::Packet p{};
+            p.header.command = Communications_protocol::BATTERY_SAVING;
+            p.header.size = 1;
+            p.data[0] = p_battery_conf->saving_mode;
+            Communications.sendPacket(p);
+        }
+    }
+
+    return KBDAPI_EVENT_RESULT_CONSUMED;
+}
+
+const kbdif_handlers_t Battery::kbdif_handlers =
+{
+    .key_event_cb = kbdif_key_event_cb,
+    .command_event_cb = kbdif_command_event_cb,
+};
+
+/****************************************************/
+/*                   Config Memory                  */
+/****************************************************/
+
+void Battery::cfgmem_saving_mode_config_save( uint8_t saving_mode )
+{
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_battery_conf->saving_mode, &saving_mode, sizeof( p_battery_conf->saving_mode ) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
+}
+
+class Battery Battery;

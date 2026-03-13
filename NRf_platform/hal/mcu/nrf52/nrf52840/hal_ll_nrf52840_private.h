@@ -1,8 +1,7 @@
-
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,26 +22,21 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __HAL_LL_NRF52840_PRIVATE_H_
+#define __HAL_LL_NRF52840_PRIVATE_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "nrf52840_bitfields.h"
 
-#include "dl_types.h"
-#include "dl_assert.h"
+/**************************** Flash ****************************/
+#define NRF52_LL_FLASH_ADDRESS_MIN          0x00000000
+#define NRF52_LL_FLASH_ADDRESS_MAX          0x000FFFFF
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
+#define NRF52_LL_FLASH_SIZE                 (NRF52_LL_FLASH_ADDRESS_MAX - NRF52_LL_FLASH_ADDRESS_MIN + 1)
+#define NRF52_LL_FLASH_PAGE_SIZE            4096
 
-#include "utils/dl_crc32.h"
+#define NRF52_LL_FLASH_ALIGN                4
+#define NRF52_LL_FLASH_ALIGN_MASK           0x00000003
 
-#include "config_app.h"
+#define NRF52_LL_FLASH_ALIGN_REWRITE_MAX    2
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* __HAL_LL_NRF52840_PRIVATE_H_ */

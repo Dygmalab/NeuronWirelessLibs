@@ -1,5 +1,5 @@
 /* -*- mode: c++ -*-
- * kaleidoscope::plugin::RadioManager -- Manage RF Signal and status in wireless devices
+ * RadioManager -- Manage RF Signal and status in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
@@ -19,35 +19,38 @@
  */
 
 #include "Radio_manager.h"
-#include "Adafruit_USBD_Device.h"
-#include "CRC_wrapper.h"
 #include "Communications.h"
+#include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "nrf_gpio.h"
 #include "rf_host_device_api.h"
-namespace kaleidoscope
-{
-namespace plugin
-{
 
-uint16_t RadioManager::settings_base_ = 0;
+#include "kbd_if_manager.h"
+
+const RadioManager::rf_config_t * RadioManager::p_rf_config = nullptr;
 bool RadioManager::inited = false;
-RadioManager::Power RadioManager::power_rf = LOW_P;
 uint16_t RadioManager::channel_hop;
-EventHandlerResult RadioManager::onSetup()
+
+result_t RadioManager::init()
 {
-    settings_base_ = kaleidoscope::plugin::EEPROMSettings::requestSlice(sizeof(power_rf));
-    Runtime.storage().get(settings_base_, power_rf);
-    if (power_rf == 0xFF)
+    result_t result = RESULT_ERR;
+
+    result = kbdif_initialize();
+    EXIT_IF_ERR( result, "kbdif_initialize failed" );
+
+    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_RF, (const void **)&p_rf_config );
+    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+
+    /* Check if the config is cleared */
+    if( p_rf_config->rf_power == 0xFF )
     {
-        power_rf = LOW_P;
-        Runtime.storage().put(settings_base_, power_rf);
-        Runtime.storage().commit();
+        cfgmem_rf_power_save( LOW_P );
     }
-    return EventHandlerResult::OK;
+
+_EXIT:
+    return result;
 }
 
-void RadioManager::init()
+void RadioManager::enable()
 {
     NRF_LOG_INFO("Working with RF");
     inited = true;
@@ -63,7 +66,7 @@ void RadioManager::init()
 void RadioManager::setPowerRF()
 {
     if (!inited) return;
-    switch (power_rf)
+    switch (p_rf_config->rf_power)
     {
         case LOW_P:
             rfgw_tx_power_set(RFGW_TX_POWER_0_DBM);
@@ -74,38 +77,77 @@ void RadioManager::setPowerRF()
         case HIGH_P:
             rfgw_tx_power_set(RFGW_TX_POWER_8_DBM);
             break;
+        default:
+            ASSERT_DYGMA( false, "Invalid RF power option" );
+            break;
     }
 }
 
-EventHandlerResult RadioManager::onFocusEvent(const char *command)
+bool RadioManager::isInited()
 {
-    if (::Focus.handleHelp(command, "wireless.rf.power\nwireless.rf.channelHop\nwireless.rf.syncPairing")) return EventHandlerResult::OK;
+    return inited;
+}
 
-    if (strncmp(command, "wireless.rf.", 12) != 0) return EventHandlerResult::OK;
+void RadioManager::poll()
+{
+    return rfgw_poll();
+}
+
+result_t RadioManager::kbdif_initialize()
+{
+    result_t result = RESULT_ERR;
+    kbdif_conf_t config;
+
+    /* Prepare the kbdif configuration */
+    config.p_instance = NULL;       /* The module is whole static */
+    config.handlers = &kbdif_handlers;
+
+    /* Initialize the kbdif */
+    result = kbdif_init( &p_kbdif, &config );
+    EXIT_IF_ERR( result, "kbdif_init failed" );
+
+    /* Add the kbdif into the kbdif manager */
+    result = kbdifmgr_add( RadioManager::p_kbdif );
+    EXIT_IF_ERR( result, "kbdifmgr_add failed" );
+
+_EXIT:
+    return result;
+}
+
+kbdapi_event_result_t RadioManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
+{
+    if (::Focus.handleHelp(p_command, "wireless.rf.power\nwireless.rf.channelHop\nwireless.rf.syncPairing"))
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strncmp(p_command, "wireless.rf.", 12) != 0)
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
 
     // Will be apply
-    if (strcmp(command + 12, "power") == 0)
+    if (strcmp(p_command + 12, "power") == 0)
     {
         if (::Focus.isEOL())
         {
             NRF_LOG_DEBUG("read request: wireless.rf.power");
-            ::Focus.send<uint8_t>((uint8_t)power_rf);
+            ::Focus.send<uint8_t>((uint8_t)p_rf_config->rf_power);
         }
         else
         {
-            uint8_t power;
-            ::Focus.read(power);
-            if (power <= HIGH_P)
+            uint8_t rf_power;
+            ::Focus.read(rf_power);
+            if (rf_power <= HIGH_P)
             {
-                power_rf = (RadioManager::Power)power;
+                cfgmem_rf_power_save( (rf_power_t)rf_power );
+
                 setPowerRF();
-                Runtime.storage().put(settings_base_, power_rf);
-                Runtime.storage().commit();
             }
         }
     }
 
-    if (strcmp(command + 12, "channelHop") == 0)
+    if (strcmp(p_command + 12, "channelHop") == 0)
     {
         if (::Focus.isEOL())
         {
@@ -119,7 +161,7 @@ EventHandlerResult RadioManager::onFocusEvent(const char *command)
         }
     }
 
-    if (strcmp(command + 12, "syncPairing") == 0)
+    if (strcmp(p_command + 12, "syncPairing") == 0)
     {
         if (::Focus.isEOL())
         {
@@ -133,20 +175,27 @@ EventHandlerResult RadioManager::onFocusEvent(const char *command)
         }
     }
 
-    return EventHandlerResult::EVENT_CONSUMED;
+    return KBDAPI_EVENT_RESULT_CONSUMED;
 }
 
-bool RadioManager::isInited()
+const kbdif_handlers_t RadioManager::kbdif_handlers =
 {
-    return inited;
-}
+    .key_event_cb = NULL,
+    .command_event_cb = kbdif_command_event_cb,
+};
 
-void RadioManager::poll()
+/****************************************************/
+/*                   Config Memory                  */
+/****************************************************/
+
+void RadioManager::cfgmem_rf_power_save( rf_power_t rf_power )
 {
-    return rfgw_poll();
+    result_t result = RESULT_ERR;
+
+    result = ConfigManager.config_item_update( &p_rf_config->rf_power, &rf_power, sizeof( p_rf_config->rf_power) );
+    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+
+    UNUSED( result );
 }
 
-} // namespace plugin
-} //  namespace kaleidoscope
-
-kaleidoscope::plugin::RadioManager RadioManager;
+class RadioManager RadioManager;

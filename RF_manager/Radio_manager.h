@@ -1,5 +1,5 @@
 /* -*- mode: c++ -*-
- * kaleidoscope::plugin::RadioManager -- Manage RF Signal and status in wireless devices
+ * RadioManager -- Manage RF Signal and status in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
@@ -20,39 +20,49 @@
 
 #pragma once
 
-#include "kaleidoscope/plugin.h"
-#include "kaleidoscope/Runtime.h"
-#include <Kaleidoscope-EEPROM-Settings.h>
-#include <Kaleidoscope-Ranges.h>
-#include <Arduino.h>
+#include "kbd_if.h"
 
+class RadioManager {
 
-namespace kaleidoscope {
-namespace plugin {
-class RadioManager : public Plugin {
-   public:
-    EventHandlerResult onSetup();
-    static void init();
-    static void poll();
-    EventHandlerResult onFocusEvent(const char *command);
+  public:
+    typedef enum : uint8_t
+    {
+        LOW_P,
+        MEDIUM_P,
+        HIGH_P,
+    } rf_power_t;
 
-    static bool isEnabled();
-    static bool isInited();
+    typedef struct PACK
+    {
+        rf_power_t rf_power;
+    } rf_config_t;
+
+  public:
+
+    result_t init();
+    void enable();
+    void poll();
+
+    bool isEnabled();
+    bool isInited();
+
+  private:
+    kbdif_t * p_kbdif = NULL;
+    result_t kbdif_initialize(void);
+
   private:
 
-    enum Power :uint8_t {
-         LOW_P,
-         MEDIUM_P,
-         HIGH_P,
-     };
+    static const rf_config_t * p_rf_config;
+
     static bool inited;
     static uint16_t channel_hop;
-    static Power power_rf;
-    static uint16_t settings_base_;
     static void setPowerRF();
+
+    static const kbdif_handlers_t kbdif_handlers;
+
+    static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
+
+    static void cfgmem_rf_power_save( rf_power_t rf_power );
 };
 
-}  // namespace plugin
-}  // namespace kaleidoscope
-
-extern kaleidoscope::plugin::RadioManager RadioManager;
+extern class RadioManager RadioManager;

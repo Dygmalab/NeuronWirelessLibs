@@ -34,10 +34,11 @@
 
     #if HAL_CFG_MCU == HAL_MCU_NRF52833
         #define HAL_MCU_LL_SPEC_LINK "hal/mcu/nrf52/nrf52833/hal_ll_nrf52833_private.h"
+    #elif HAL_CFG_MCU == HAL_MCU_NRF52840
+        #define HAL_MCU_LL_SPEC_LINK "hal/mcu/nrf52/nrf52840/hal_ll_nrf52840_private.h"
     #else
         #undef HAL_CFG_MCU_SERIES
     #endif
-
 #endif /* HAL_CFG_MCU_SERIES */
 
 #if HAL_CFG_MCU_SERIES == HAL_MCU_SERIES_NRF52

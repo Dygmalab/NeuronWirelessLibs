@@ -1,5 +1,5 @@
 /* -*- mode: c++ -*-
- * kaleidoscope::plugin::Battery_manager -- Manage battery levels and status in wireless devices
+ * Battery_manager -- Manage battery levels and status in wireless devices
  * Copyright (C) 2020  Dygma Lab S.L.
  *
  * This program is free software: you can redistribute it and/or modify it under
@@ -18,26 +18,32 @@
  *
  */
 #pragma once
-#include "kaleidoscope/plugin.h"
-#include "kaleidoscope/Runtime.h"
-#include <Kaleidoscope-EEPROM-Settings.h>
-#include <Kaleidoscope-Ranges.h>
-#include <Arduino.h>
 #include <cstdint>
 
-namespace kaleidoscope {
-namespace plugin {
-class Battery : public Plugin {
-   public:
-    EventHandlerResult onSetup();
-    EventHandlerResult onFocusEvent(const char *command);
-    EventHandlerResult onKeyswitchEvent(Key &mapped_key, KeyAddr key_addr, uint8_t key_state);
-    EventHandlerResult beforeReportingState();
+#include "kbd_if.h"
 
+class Battery {
+   public:
+    typedef struct PACK
+    {
+        uint8_t saving_mode;;
+    } battery_conf_t;
+
+   public:
+    result_t init( void );
+    void run( void );
+
+   public:
     static uint8_t get_battery_status_left(void);
     static uint8_t get_battery_status_right(void);
 
    private:
+    kbdif_t * p_kbdif = NULL;
+    result_t kbdif_initialize(void);
+
+   private:
+
+    static const battery_conf_t * p_battery_conf;
 
     struct bat_status_side_t
     {
@@ -86,8 +92,6 @@ class Battery : public Plugin {
     static void set_battery_status_right(uint8_t status);
 
     static uint8_t battery_level;
-    static uint8_t saving_mode;
-    static uint16_t settings_saving_;
     static uint8_t status_left;
     static uint8_t status_right;
     static uint8_t battery_level_left;
@@ -95,9 +99,13 @@ class Battery : public Plugin {
 
     static bat_status_side_t right;
     static bat_status_side_t left; 
+
+    static const kbdif_handlers_t kbdif_handlers;
+
+    static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
+    static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
+
+    static void cfgmem_saving_mode_config_save( uint8_t saving_mode );
 };
 
-}  // namespace plugin
-}  // namespace kaleidoscope
-
-extern kaleidoscope::plugin::Battery Battery;
+extern class Battery Battery;

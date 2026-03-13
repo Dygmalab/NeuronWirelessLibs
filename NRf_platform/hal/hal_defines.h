@@ -36,5 +36,6 @@
 #define HAL_MCU_UNKNOWN             0x0000
 #define HAL_MCU_NRF52820            0x0120
 #define HAL_MCU_NRF52833            0x0133
+#define HAL_MCU_NRF52840            0x0140
 
 #endif /* __HAL_DEFINES_H_ */

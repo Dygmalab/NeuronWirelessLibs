@@ -23,57 +23,77 @@
 
 #include "Fifo_buffer.h"
 
+#ifndef BSP_SPI_PORT_SPI0
+#define BSP_SPI_PORT_SPI0            0
+#endif /* BSP_SPI_PORT_SPI0 */
+
+#ifndef BSP_SPI_PORT_SPI1
+#define BSP_SPI_PORT_SPI1            0
+#endif /* BSP_SPI_PORT_SPI1 */
+
+#ifndef BSP_SPI_PORT_SPI2
+#define BSP_SPI_PORT_SPI2            0
+#endif /* BSP_SPI_PORT_SPI2 */
+
+#if ( BSP_SPI_PORT_SPI0 + BSP_SPI_PORT_SPI1 + BSP_SPI_PORT_SPI2 ) == 0
+#error "At least one SPI port is expected to be chosen."
+#endif
 
 // SPI0
-#if COMPILE_SPI0_SUPPORT
+#if BSP_SPI_PORT_SPI0
 Spi_slave spi0_slave(0,                /* Chip SPI port used */
-                     PIN_MISO0,        /* MISO0 */
-                     PIN_MOSI0,        /* MOSI0 */
-                     PIN_CLK0,         /* Clock0 */
-                     PIN_CS0,          /* Chip Select 0 */
+                     BSP_SPI0_MISO,        /* MISO0 */
+                     BSP_SPI0_MOSI,        /* MOSI0 */
+                     BSP_SPI0_CLK,         /* Clock0 */
+                     BSP_SPI0_CS,          /* Chip Select 0 */
                      NRF_SPIS_MODE_1); /* -> CPOL = 0 / CPHA = 1 */
 #endif
 
 // SPI1
-#if COMPILE_SPI1_SUPPORT
+#if BSP_SPI_PORT_SPI1
 Spi_slave spi1_slave(1,                /* Chip SPI port used */
-                     PIN_MISO1,        /* MISO1 */
-                     PIN_MOSI1,        /* MOSI1 */
-                     PIN_CLK1,         /* Clock1 */
-                     PIN_CS1,          /* Chip Select 1 */
+                     BSP_SPI1_MISO,        /* MISO1 */
+                     BSP_SPI1_MOSI,        /* MOSI1 */
+                     BSP_SPI1_CLK,         /* Clock1 */
+                     BSP_SPI1_CS,          /* Chip Select 1 */
                      NRF_SPIS_MODE_1); /* -> CPOL = 0 / CPHA = 1 */
 #endif
 
 // SPI2
-#if COMPILE_SPI2_SUPPORT
+#if BSP_SPI_PORT_SPI2
 Spi_slave spi2_slave(2,                /* Chip SPI port used */
-                     PIN_MISO2,        /* MISO2 */
-                     PIN_MOSI2,        /* MOSI2 */
-                     PIN_CLK2,         /* Clock2 */
-                     PIN_CS2,          /* Chip Select 2 */
+                     BSP_SPI2_MISO,        /* MISO2 */
+                     BSP_SPI2_MOSI,        /* MOSI2 */
+                     BSP_SPI2_CLK,         /* Clock2 */
+                     BSP_SPI2_CS,          /* Chip Select 2 */
                      NRF_SPIS_MODE_1); /* -> CPOL = 0 / CPHA = 1 */
 #endif
 
 
 SpiPort::SpiPort(uint8_t _spi_port_used)
   : spi_port_used(_spi_port_used) {
-#if COMPILE_SPI0_SUPPORT
+#if BSP_SPI_PORT_SPI0
     if (_spi_port_used == 0) {
         spi_slave = &spi0_slave;
     }
 #endif
 
-#if COMPILE_SPI1_SUPPORT
+#if BSP_SPI_PORT_SPI1
     if (_spi_port_used == 1) {
         spi_slave = &spi1_slave;
     }
 #endif
 
-#if COMPILE_SPI2_SUPPORT
+#if BSP_SPI_PORT_SPI2
     if (_spi_port_used == 2) {
         spi_slave = &spi2_slave;
     }
 #endif
+
+    if( spi_slave == nullptr )
+    {
+        ASSERT_DYGMA( false, "The requested SPI port is not supported." );
+    }
 }
 
 void SpiPort::init() {

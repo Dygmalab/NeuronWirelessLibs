@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,26 +23,28 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#include "dl_utils.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+uint32_t array_popcount_get( uint8_t * p_array, uint32_t array_len )
+{
+    uint32_t popcount = 0;
+    uint32_t i;
 
-#include "dl_types.h"
-#include "dl_assert.h"
+    for( i = 0; i < array_len; i++ )
+    {
+        popcount += __builtin_popcount( p_array[i] );
+    }
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
-
-#include "utils/dl_crc32.h"
-
-#include "config_app.h"
-
-#ifdef __cplusplus
+    return popcount;
 }
-#endif
 
-#endif /* __DL_MIDDLEWARE_H */
+uint8_t array_bit_get( uint8_t * p_array, uint32_t array_len, uint32_t array_bit_pos )
+{
+    uint32_t byte_pos = array_bit_pos >> 3;         /* (array_bit_pos / 8) */
+    uint32_t bit_pos = array_bit_pos & 0x00000007;  /* (array_bit_pos % 8) */
+
+    uint8_t byte = p_array[byte_pos];
+    uint8_t bit = ( byte >> bit_pos ) & 0x01;
+
+    return bit;
+}

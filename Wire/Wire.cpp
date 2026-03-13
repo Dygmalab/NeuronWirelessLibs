@@ -17,6 +17,7 @@
  * Author: Juan Hauara @JuanHauara
  */
 
+#include "common.h"
 #include "Wire.h"
 
 #include "Arduino.h"
@@ -38,7 +39,7 @@ extern "C"
 
 bool Wire::twi_already_init = false;
 
-static Twi_master twi_master(TWI_SCL_PIN, TWI_SDA_PIN);
+static Twi_master twi_master(BSP_TWI_SCL_PIN, BSP_TWI_SDA_PIN);
 
 Wire Wire1;
 

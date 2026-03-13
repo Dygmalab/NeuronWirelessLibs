@@ -23,26 +23,31 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __UTILS_H_
+#define __UTILS_H_
+
+#include "dl_middleware.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "dl_types.h"
-#include "dl_assert.h"
+#ifndef DYGMA_CORE_UTILS_SPECIFIED
+#define DYGMA_CORE_UTILS_SPECIFIED
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
+#define _get_def( def, _defs, _def_type, _id, id ) { def = NULL; \
+    for ( size_t index = 0; index < sizeof( _defs ) / sizeof( _def_type ); ++index ) \
+    if ( _defs[ index ]._id == id ) { def = &_defs[ index ]; break; } }
 
-#include "utils/dl_crc32.h"
+#endif /* DYGMA_CORE_UTILS_SPECIFIED */
 
-#include "config_app.h"
+/* Read number of set bits in an uint8_t array */
+extern uint32_t array_popcount_get( uint8_t * p_array, uint32_t array_len );
+/* Read value of a bit in an uint8_t array */
+extern uint8_t array_bit_get( uint8_t * p_array, uint32_t array_len, uint32_t array_bit_pos );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* __UTILS_H_ */

@@ -1,8 +1,7 @@
-
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2025  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,13 +22,29 @@
  * SOFTWARE.
  */
 
-#ifndef __UTILS_H_
-#define __UTILS_H_
+#ifndef __LINK_LIST_H_
+#define __LINK_LIST_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "dl_middleware.h"
 
-#define _get_def( def, _defs, _def_type, _id, id ) { def = NULL; \
-    for ( size_t index = 0; index < sizeof( _defs ) / sizeof( _def_type ); ++index ) \
-    if ( _defs[ index ]._id == id ) { def = &_defs[ index ]; break; } }
+typedef struct linklist linklist_t;
 
-#endif /* __UTILS_H_ */
+extern result_t linklist_init( linklist_t ** pp_linklist );
+
+extern result_t linklist_add( linklist_t * p_linklist, void * p_instance );
+extern void * linklist_get( linklist_t * p_linklist );                       /* Returns currently navigated p_instance previously
+                                                                                added to the list with linklist_add */
+extern void linklist_nav_head( linklist_t * p_linklist );
+extern void linklist_nav_tail( linklist_t * p_linklist );
+extern void linklist_nav_next( linklist_t * p_linklist );
+extern void linklist_nav_prev( linklist_t * p_linklist );
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __LINK_LIST_H_ */

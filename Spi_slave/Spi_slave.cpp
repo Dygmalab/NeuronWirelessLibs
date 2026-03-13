@@ -269,6 +269,7 @@ void Spi_slave::data_out_process( void )
     ASSERT_DYGMA( data_out_len == sizeof( spi_packet ), "Failure: Empty Packet received from FIFO" );
 
     spi_packet.header.has_more_packets = ( spi_tx_fifo.is_empty() == true ) ? false : true;
+    
     spi_packet.header.crc = 0;
     spi_packet.header.crc = crc8( spi_packet.buf, sizeof(Communications_protocol::Header) + spi_packet.header.size );
 
