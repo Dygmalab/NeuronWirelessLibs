@@ -21,6 +21,7 @@
 #include "Wire.h"
 
 #include "Arduino.h"
+#include "Time_counter.h"
 #include "Twi_master.h"
 
 #ifdef __cplusplus
@@ -146,6 +147,8 @@ bool Wire::read(uint8_t *data, uint16_t data_len)
         Returns true if succes or false if not.
     */
 
+    dl_timer_t timer;
+
     memset(data, 0, data_len); // Clear buffer.
 
 #if TWI_DEBUG
@@ -166,10 +169,11 @@ bool Wire::read(uint8_t *data, uint16_t data_len)
     }
 
     // Wait for the transmission to get completed.
-    uint64_t ti = millis();
+    timer_set_ms( &timer, _timeout );
+
     while (!twi_master.transfer_completed())
     {
-        if ((millis() - ti) > _timeout)
+        if ( timer_check( &timer ) == true )
         {
             twi_master.reset_module();
 
@@ -207,6 +211,8 @@ bool Wire::write(uint8_t *data, uint16_t data_len)
         Returns true if succes or false if not.
     */
 
+    dl_timer_t timer;
+
 #if TWI_DEBUG
     NRF_LOG_INFO("Writing %d Bytes..", data_len);
     NRF_LOG_FLUSH();
@@ -225,10 +231,11 @@ bool Wire::write(uint8_t *data, uint16_t data_len)
     }
 
     // Wait for the transmission to get completed.
-    uint64_t ti = millis();
+    timer_set_ms( &timer, _timeout );
+
     while (!twi_master.transfer_completed())
     {
-        if ((millis() - ti) > _timeout)
+        if (timer_check( &timer ) == true)
         {
             twi_master.reset_module();
 

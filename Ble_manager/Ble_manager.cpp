@@ -33,6 +33,7 @@ void device_name_evt_handler(void);
 
 #define BLE_MANAGER_DEBUG_LOG   1
 
+#define KEY_ERASE_HOLD_TIMEOUT_MS   3000
 
 Do_once clear_pin_digits_count;
 
@@ -398,7 +399,6 @@ void BleManager::erase_paired_device(uint8_t index_channel)
         NRF_LOG_FLUSH();
 #endif
 
-        connectionState[index_channel].timePressed = 0;
         connectionState[index_channel].longPress = true;
         uint8_t peerCount = pm_peer_count();
         pm_peer_id_t peer_list[peerCount];
@@ -750,10 +750,10 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
             uint8_t index_channel = channel_in_use;
             if ( p_key->toggled_on )
             {
-                connectionState[index_channel].timePressed = millis();
+                timer_set_ms( &connectionState[index_channel].pressedTimer, KEY_ERASE_HOLD_TIMEOUT_MS);
             }
 
-            if ( p_key->is_pressed && millis() - connectionState[index_channel].timePressed >= 3000)
+            if ( p_key->is_pressed && timer_check( &connectionState[index_channel].pressedTimer ) )
             {
                 // TODO: create a led effect to let the user know that the erease was successful
                 erase_paired_device(index_channel);
@@ -763,7 +763,6 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 
             if ( p_key->toggled_off )
             {
-                connectionState[index_channel].timePressed = 0;
                 connectionState[index_channel].longPress = false;
             }
         }
