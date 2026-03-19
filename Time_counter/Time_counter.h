@@ -10,7 +10,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
- * Author: Juan Hauara @JuanHauara
  */
 
 #ifndef __TIME_COUNTER_NRF__
@@ -41,36 +39,10 @@ extern "C"
 {
 #endif
 
-#include "nrf_drv_timer.h"
+#include "dl_middleware.h"
 
-// Set parameters:
-#define TIMER_NUMBER 4                         // Timer used for generate the compare events for increment the millis and micros counters.
-#define TIMER_CC_CHANNEL NRF_TIMER_CC_CHANNEL0 // CC channel used for generate the millis interrupt: NRF_TIMER_CC_CHANNEL0, NRF_TIMER_CC_CHANNEL1, ..
-
-#define TIMER_FREQUENCY NRF_TIMER_FREQ_16MHz
-#define TIMER_FREQUENCY_IN_MHZ 16
-
-#if (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL0)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE0
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK
-#elif (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL1)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE1
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE1_CLEAR_MASK
-#elif (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL2)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE2
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE2_CLEAR_MASK
-#elif (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL3)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE3
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE3_CLEAR_MASK
-#elif (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL4)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE4
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE4_CLEAR_MASK
-#elif (TIMER_COUNT_TIME_CC_CHANNEL == NRF_TIMER_CC_CHANNEL5)
-#define TIMER_COMPARE_EVENT_NUMBER NRF_TIMER_EVENT_COMPARE5
-#define TIMER_CLEAR NRF_TIMER_SHORT_COMPARE5_CLEAR_MASK
-#endif
-
-typedef uint64_t dl_timer_t;
+typedef uint64_t systim_tick_t;
+typedef systim_tick_t dl_timer_t;
 
 void timer_counter_init(uint32_t micros_resolution);
 uint64_t timer_counter_get_millis(void);
