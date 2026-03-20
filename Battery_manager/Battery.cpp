@@ -31,7 +31,6 @@
 #define NOT_CHARGING 0
 
 #define EQUAL_STATE_COUNT 4
-#define DISCONNECT_GRACE_MS 3000
 #define DEBUG_LOG_BATTERY_MANAGER   0
 
 const Battery::battery_conf_t * Battery::p_battery_conf = nullptr;
@@ -82,7 +81,7 @@ result_t Battery::init()
             if (left.disconnect_pending) { left.cancelDisconnect(); }
             set_battery_status_left( packet.data[0]);
             // Mark fresh status arrival for LEFT
-            left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+            left.last_status_packet_timer_reset();
             if (left.status_requested) { left.resetStatusRequested(); }
         }
 
@@ -92,7 +91,7 @@ result_t Battery::init()
             if (right.disconnect_pending) { right.cancelDisconnect(); }
             set_battery_status_right(packet.data[0]);
             // Mark fresh status arrival for RIGHT
-            right.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+            right.last_status_packet_timer_reset();
             if (right.status_requested) { right.resetStatusRequested(); }
         }
 
@@ -139,14 +138,14 @@ result_t Battery::init()
         {
             battery_level_left = 100;
             left.reset();
-            left.startDisconnect(kaleidoscope::Runtime.millisAtCycleStart());
+            left.startDisconnect();
         }
 
         if (filterHand(packet.header.device, true))
         {
             battery_level_right = 100;
             right.reset();
-            right.startDisconnect(kaleidoscope::Runtime.millisAtCycleStart());
+            right.startDisconnect();
         }
 
         ble_battery_level_update(min(battery_level_left, battery_level_right));
@@ -228,9 +227,8 @@ void Battery::set_battery_status_right(uint8_t battery_status)
 void Battery::run()
 {
     // Confirm pending DISCONNECTED only after grace period
-    uint32_t now = kaleidoscope::Runtime.millisAtCycleStart();
 
-    if (left.disconnect_pending && (now - left.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    if (left.disconnect_pending && ( left.disconnect_grace_started_timer_check() == true ))
     {
         status_left = 4;
         left.cancelDisconnect();
@@ -239,7 +237,7 @@ void Battery::run()
 #endif
     }
 
-    if (right.disconnect_pending && (now - right.disconnect_grace_started_ms >= DISCONNECT_GRACE_MS))
+    if (right.disconnect_pending && ( right.disconnect_grace_started_timer_check() == true ))
     {
         status_right = 4;
         right.cancelDisconnect();
@@ -248,9 +246,9 @@ void Battery::run()
 #endif
     }
 
-    if(left.status_requested && (now - left.last_status_packet_ms >= 1500))
+    if(left.status_requested && (left.last_status_packet_timer_check() == true))
     {
-        left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+        left.last_status_packet_timer_reset();
 
         /* We will send the BATTERY_STATUS command to both sides.
         * So we don't need to check if the right side has requested a status.
@@ -347,7 +345,7 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
         if (::Focus.isEOL())
         {
             right.requestStatus();
-            right.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+            right.last_status_packet_timer_reset();
 
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.right.status");
@@ -361,7 +359,7 @@ kbdapi_event_result_t Battery::kbdif_command_event_cb( void * p_instance, const 
         if (::Focus.isEOL())
         {
             left.requestStatus();
-            left.last_status_packet_ms = kaleidoscope::Runtime.millisAtCycleStart();
+            left.last_status_packet_timer_reset();
 
 #if DEBUG_LOG_BATTERY_MANAGER
             NRF_LOG_DEBUG("read request: wireless.battery.left.status");

@@ -21,6 +21,10 @@
 #include <cstdint>
 
 #include "kbd_if.h"
+#include "Time_counter.h"
+
+#define DISCONNECT_GRACE_TIMEOUT_MS     3000
+#define LAST_STATUS_PACKET_TIMEOUT_MS   1500
 
 class Battery {
    public:
@@ -51,25 +55,43 @@ class Battery {
         uint8_t status_confirm_count;
 
         // Debounce for DISCONNECTED (status 4)
-        uint32_t disconnect_grace_started_ms;
+        dl_timer_t disconnect_grace_started_timer;
         bool disconnect_pending;
 
-        uint32_t last_status_packet_ms;
+        dl_timer_t last_status_packet_timer;
         bool status_requested;
+
+        void disconnect_grace_started_timer_reset()
+        {
+            timer_set_ms( &disconnect_grace_started_timer, DISCONNECT_GRACE_TIMEOUT_MS );
+        }
+
+        bool disconnect_grace_started_timer_check()
+        {
+            return timer_check( &disconnect_grace_started_timer );
+        }
+
+        void last_status_packet_timer_reset()
+        {
+            timer_set_ms( &last_status_packet_timer, LAST_STATUS_PACKET_TIMEOUT_MS );
+        }
+
+        bool last_status_packet_timer_check()
+        {
+            return timer_check( &last_status_packet_timer );
+        }
 
         void reset()
         {
             last_status_received = 4;
             status_confirm_count = 0;
             disconnect_pending = false;
-            disconnect_grace_started_ms = 0;
-            last_status_packet_ms = 0;
         }
 
-        void startDisconnect(uint32_t now)
+        void startDisconnect()
         {
             disconnect_pending = true;
-            disconnect_grace_started_ms = now;
+            disconnect_grace_started_timer_reset();
         }
 
         void cancelDisconnect()

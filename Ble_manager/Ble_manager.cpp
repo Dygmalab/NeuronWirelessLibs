@@ -223,13 +223,13 @@ void BleManager::timer_save_conn_run(uint32_t timeout_ms)
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Start timer save connection.");
 #endif
-        ti_save_new_conn = kaleidoscope::Runtime.millisAtCycleStart();
+        timer_set_ms( &timer_save_new_conn, timeout_ms );
         timer_save_conn_start_count = true;
     }
 
     if (timer_save_conn_start_count)
     {
-        if (kaleidoscope::Runtime.hasTimeExpired(ti_save_new_conn, timeout_ms))
+        if ( timer_check(&timer_save_new_conn) == true )
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Timeout timer save connection.");
@@ -294,13 +294,13 @@ void BleManager::timer_save_name_run(uint32_t timeout_ms)
 #if BLE_MANAGER_DEBUG_LOG
         NRF_LOG_DEBUG("Ble_manager: Start timer save name.");
 #endif
-        ti_save_new_name = kaleidoscope::Runtime.millisAtCycleStart();
+        timer_set_ms( &timer_save_new_name, timeout_ms );
         timer_save_name_start_count = true;
     }
 
     if (timer_save_name_start_count)
     {
-        if (kaleidoscope::Runtime.hasTimeExpired(ti_save_new_name, timeout_ms))
+        if ( timer_check(&timer_save_new_name) == true )
         {
 #if BLE_MANAGER_DEBUG_LOG
             NRF_LOG_DEBUG("Ble_manager: Timeout timer save name.");
