@@ -86,7 +86,7 @@ void _interrupt_disable( void )
 
 static void _systim_ticks_update( void )
 {
-    ASSERT_DYGMA( systim.initialized == true, "Systim has not been initialized yet." );
+    ASSERT_DYGMA( initialized == true, "Systim has not been initialized yet." );
 
     //stop interrupts
     _interrupt_disable( );
