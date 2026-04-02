@@ -46,6 +46,7 @@
     #define HAL_MCU_LL_GPIO_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_gpio.h"
     #define HAL_MCU_LL_MCU_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_mcu.h"
     #define HAL_MCU_LL_MUTEX_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_mutex.h"
+    #define HAL_MCU_LL_PWR_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_pwr.h"
     #define HAL_MCU_LL_SPI_LINK "hal/mcu/nrf52/hal_ll_nrf528xx_spi.h"
 
 #endif /* HAL_CFG_MCU_SERIES */

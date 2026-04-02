@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,63 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#include "mcu.h"
+#include "halsep/hal_mcu_pwr.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct
+{
+    bool_t sleep_now;
+} mcu_t;
 
-#include "dl_types.h"
-#include "dl_assert.h"
+static mcu_t mcu;
 
-#include "system/mcu.h"
+/* Prototypes */
+static result_t _sleep_init( mcu_t * p_mcu );
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
+result_t mcu_init( void )
+{
+    result_t result = RESULT_ERR;
 
-#include "utils/dl_crc32.h"
+    result = _sleep_init( &mcu );
+    EXIT_IF_ERR( result, "_sleep_init failed" );
 
-#include "config_app.h"
-
-#ifdef __cplusplus
+_EXIT:
+    return result;
 }
-#endif
 
-#endif /* __DL_MIDDLEWARE_H */
+/*******************************************/
+/*              Sleep Control              */
+/*******************************************/
+
+static result_t _sleep_init( mcu_t * p_mcu )
+{
+    result_t result = RESULT_ERR;
+
+    result = hal_mcu_pwr_init();
+    EXIT_IF_ERR( result, "hal_mcu_pwr_init failed" );
+
+    mcu.sleep_now = true;
+
+_EXIT:
+    return result;
+}
+
+result_t mcu_sleep_init( void )
+{
+    return _sleep_init( &mcu );
+}
+
+void mcu_sleep_postpone( void )
+{
+    mcu.sleep_now = false;
+}
+
+void mcu_sleep_control( void )
+{
+    if ( mcu.sleep_now == true )
+    {
+        hal_mcu_pwr_sleep_handle();
+    }
+
+    mcu.sleep_now = true;
+}

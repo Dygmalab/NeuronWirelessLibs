@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,29 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#include "nrf_pwr_mgmt.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "hal/mcu/hal_mcu_pwr_ll.h"
 
-#include "dl_types.h"
-#include "dl_assert.h"
+#if HAL_CFG_MCU_SERIES == HAL_MCU_SERIES_NRF52
 
-#include "system/mcu.h"
+result_t hal_ll_mcu_pwr_init( void )
+{
+    uint32_t err_code;
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
+    /* Initialize the nRF power management */
+    err_code = nrf_pwr_mgmt_init( );
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "nrf_pwr_mgmt_init failed." );
 
-#include "utils/dl_crc32.h"
+    return RESULT_OK;
 
-#include "config_app.h"
-
-#ifdef __cplusplus
+    UNUSED( err_code );
 }
-#endif
 
-#endif /* __DL_MIDDLEWARE_H */
+void hal_ll_mcu_pwr_sleep_handle( void )
+{
+    nrf_pwr_mgmt_run();
+}
+
+#endif /* HAL_CFG_MCU_SERIES */
+

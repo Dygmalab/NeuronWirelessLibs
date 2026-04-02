@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,23 @@
  * SOFTWARE.
  */
 
-#ifndef __DL_MIDDLEWARE_H
-#define __DL_MIDDLEWARE_H
+#ifndef __HAL_MCU_PWR_H_
+#define __HAL_MCU_PWR_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "dl_types.h"
-#include "dl_assert.h"
+#include "dl_middleware.h"
+#include "hal_config.h"
 
-#include "system/mcu.h"
+#include HAL_MCU_LL_PWR_LINK
 
-#include "memory/heap.h"
-#include "memory/link_list.h"
-#include "utils/dl_utils.h"
-
-#include "utils/dl_crc32.h"
-
-#include "config_app.h"
+extern result_t hal_mcu_pwr_init( void );
+extern void hal_mcu_pwr_sleep_handle( void );
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __DL_MIDDLEWARE_H */
+#endif /* __HAL_MCU_PWR_H_ */
