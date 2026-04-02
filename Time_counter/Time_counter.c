@@ -288,14 +288,14 @@ void timer_counter_init(uint32_t micros_resolution_)
     initialized = true;
 }
 
-uint64_t timer_counter_get_micros(void)
+systim_tick_t timer_counter_get_micros(void)
 {
     _systim_ticks_update( );
 
     return SYSTIM_TICK_CNT_TO_US( systim_ticks );
 }
 
-uint64_t timer_counter_get_millis(void)
+systim_tick_t timer_counter_get_millis(void)
 {
     _systim_ticks_update( );
 
