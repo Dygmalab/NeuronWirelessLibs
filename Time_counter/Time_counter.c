@@ -295,7 +295,7 @@ systim_tick_t timer_counter_get_micros(void)
     return SYSTIM_TICK_CNT_TO_US( systim_ticks );
 }
 
-systim_tick_t timer_counter_get_millis(void)
+uint32_t timer_counter_get_millis(void)
 {
     _systim_ticks_update( );
 

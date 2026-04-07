@@ -45,8 +45,8 @@ typedef uint64_t systim_tick_t;
 typedef systim_tick_t dl_timer_t;
 
 void timer_counter_init(uint32_t micros_resolution);
-systim_tick_t timer_counter_get_millis(void);
 systim_tick_t timer_counter_get_micros(void);
+uint32_t timer_counter_get_millis(void);
 
 void timer_set_ms( dl_timer_t * p_timer, uint32_t ms );
 void timer_set_us( dl_timer_t * p_timer, uint32_t us );
