@@ -1132,6 +1132,8 @@ static void _data_send_start( spils_t * p_spils )
 static INLINE void _con_state_set( spils_t * p_spils, spils_con_state_t con_state )
 {
     p_spils->con_state = con_state;
+
+    mcu_sleep_postpone();
 }
 
 static INLINE void _con_state_set_connected( spils_t * p_spils )
