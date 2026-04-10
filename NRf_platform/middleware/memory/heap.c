@@ -30,7 +30,7 @@
     #error "The size of heap is not defined. Do it in your config_app.h."
 #endif /* HEAP_SIZE */
 
-static uint8_t _pool[ HEAP_SIZE ];
+static uint8_t _pool[ HEAP_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
 static uint8_t * _pool_pointer = _pool;
 
 void * heap_alloc( size_t size )
