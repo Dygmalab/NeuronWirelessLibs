@@ -318,5 +318,25 @@ void timer_set_us( dl_timer_t * p_timer, uint32_t us )
 
 bool timer_check( dl_timer_t * p_timer )
 {
-    return ( systim_ticks >= *p_timer ) ? true : false;
+    bool ret_val = false;
+
+    _systim_ticks_update( );
+
+    //stop interrupts
+    _interrupt_disable( );
+
+    if ( *p_timer <= systim_ticks )
+    {
+        ret_val = true;
+    }
+    else
+    {
+        //try to set new threshold
+        _systim_threshold_set( p_timer );
+    }
+
+    //resume interrupts
+    _interrupt_enable( );
+
+    return ret_val;
 }
