@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,63 @@
  * SOFTWARE.
  */
 
-#include "heap.h"
-#include "config_app.h"
+#include "mcu.h"
+#include "halsep/hal_mcu_pwr.h"
 
-#ifndef HEAP_SIZE
-    #error "The size of heap is not defined. Do it in your config_app.h."
-#endif /* HEAP_SIZE */
-
-static uint8_t _pool[ HEAP_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
-static uint8_t * _pool_pointer = _pool;
-
-void * heap_alloc( size_t size )
+typedef struct
 {
-    uint8_t * result = NULL;
-    
-    /* Check the heap size */
-    ASSERT_DYGMA( ( _pool_pointer - _pool + size ) <= HEAP_SIZE, "failed - heap size exceeded" );
+    bool_t sleep_now;
+} mcu_t;
 
-    result = _pool_pointer;
-    _pool_pointer += alignment_ceil( size, MCU_ALIGNMENT_SIZE );
+static mcu_t mcu;
 
+/* Prototypes */
+static result_t _sleep_init( mcu_t * p_mcu );
+
+result_t mcu_init( void )
+{
+    result_t result = RESULT_ERR;
+
+    result = _sleep_init( &mcu );
+    EXIT_IF_ERR( result, "_sleep_init failed" );
+
+_EXIT:
     return result;
 }
 
-void heap_clear( void )
+/*******************************************/
+/*              Sleep Control              */
+/*******************************************/
+
+static result_t _sleep_init( mcu_t * p_mcu )
 {
-    memset( _pool, 0x00, sizeof( _pool ) );
-    _pool_pointer = _pool;
+    result_t result = RESULT_ERR;
+
+    result = hal_mcu_pwr_init();
+    EXIT_IF_ERR( result, "hal_mcu_pwr_init failed" );
+
+    mcu.sleep_now = true;
+
+_EXIT:
+    return result;
+}
+
+result_t mcu_sleep_init( void )
+{
+    return _sleep_init( &mcu );
+}
+
+void mcu_sleep_postpone( void )
+{
+    mcu.sleep_now = false;
+}
+
+void mcu_sleep_control( void )
+{
+    if ( mcu.sleep_now == true )
+    {
+        hal_mcu_pwr_sleep_handle();
+    }
+
+    mcu.sleep_now = true;
 }

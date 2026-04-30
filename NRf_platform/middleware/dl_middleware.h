@@ -33,6 +33,8 @@ extern "C" {
 #include "dl_types.h"
 #include "dl_assert.h"
 
+#include "system/mcu.h"
+
 #include "memory/heap.h"
 #include "memory/link_list.h"
 #include "utils/dl_utils.h"

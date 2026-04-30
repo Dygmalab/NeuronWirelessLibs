@@ -50,7 +50,7 @@ extern "C"
 class Status_leds
 {
     public:
-        Status_leds(uint16_t green_led_pin, uint16_t red_led_pin);
+        Status_leds(uint8_t green_led_pin, uint8_t red_led_pin);
 
         void init(void);
 
@@ -77,8 +77,8 @@ class Status_leds
             RED_GREEN_ALTERNATE_FLAG,
         } flag_type_t;
 
-        uint16_t _green_led_pin;
-        uint16_t _red_led_pin;
+        uint8_t _green_led_pin;
+        uint8_t _red_led_pin;
 
         nrfx_pwm_t pwm_instance;
         nrfx_pwm_config_t pwm_config;

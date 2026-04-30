@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,9 @@
  * SOFTWARE.
  */
 
-#include "heap.h"
-#include "config_app.h"
+#ifndef __HAL_LL_NRF528XX_PWR_H_
+#define __HAL_LL_NRF528XX_PWR_H_
 
-#ifndef HEAP_SIZE
-    #error "The size of heap is not defined. Do it in your config_app.h."
-#endif /* HEAP_SIZE */
 
-static uint8_t _pool[ HEAP_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
-static uint8_t * _pool_pointer = _pool;
 
-void * heap_alloc( size_t size )
-{
-    uint8_t * result = NULL;
-    
-    /* Check the heap size */
-    ASSERT_DYGMA( ( _pool_pointer - _pool + size ) <= HEAP_SIZE, "failed - heap size exceeded" );
-
-    result = _pool_pointer;
-    _pool_pointer += alignment_ceil( size, MCU_ALIGNMENT_SIZE );
-
-    return result;
-}
-
-void heap_clear( void )
-{
-    memset( _pool, 0x00, sizeof( _pool ) );
-    _pool_pointer = _pool;
-}
+#endif /* __HAL_LL_NRF528XX_PWR_H_ */

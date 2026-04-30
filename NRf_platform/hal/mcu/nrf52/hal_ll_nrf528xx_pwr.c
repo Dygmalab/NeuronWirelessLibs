@@ -2,7 +2,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (C) 2022  Dygma Lab S.L.
+ * Copyright (C) 2026  Dygma Lab S.L.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,29 @@
  * SOFTWARE.
  */
 
-#include "heap.h"
-#include "config_app.h"
+#include "nrf_pwr_mgmt.h"
 
-#ifndef HEAP_SIZE
-    #error "The size of heap is not defined. Do it in your config_app.h."
-#endif /* HEAP_SIZE */
+#include "hal/mcu/hal_mcu_pwr_ll.h"
 
-static uint8_t _pool[ HEAP_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
-static uint8_t * _pool_pointer = _pool;
+#if HAL_CFG_MCU_SERIES == HAL_MCU_SERIES_NRF52
 
-void * heap_alloc( size_t size )
+result_t hal_ll_mcu_pwr_init( void )
 {
-    uint8_t * result = NULL;
-    
-    /* Check the heap size */
-    ASSERT_DYGMA( ( _pool_pointer - _pool + size ) <= HEAP_SIZE, "failed - heap size exceeded" );
+    uint32_t err_code;
 
-    result = _pool_pointer;
-    _pool_pointer += alignment_ceil( size, MCU_ALIGNMENT_SIZE );
+    /* Initialize the nRF power management */
+    err_code = nrf_pwr_mgmt_init( );
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "nrf_pwr_mgmt_init failed." );
 
-    return result;
+    return RESULT_OK;
+
+    UNUSED( err_code );
 }
 
-void heap_clear( void )
+void hal_ll_mcu_pwr_sleep_handle( void )
 {
-    memset( _pool, 0x00, sizeof( _pool ) );
-    _pool_pointer = _pool;
+    nrf_pwr_mgmt_run();
 }
+
+#endif /* HAL_CFG_MCU_SERIES */
+

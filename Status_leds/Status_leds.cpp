@@ -42,7 +42,7 @@ extern "C"
 #endif
 
 
-Status_leds::Status_leds(uint16_t green_led_pin, uint16_t red_led_pin)
+Status_leds::Status_leds(uint8_t green_led_pin, uint8_t red_led_pin)
 {
     _green_led_pin = green_led_pin;
     _red_led_pin = red_led_pin;

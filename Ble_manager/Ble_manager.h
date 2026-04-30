@@ -23,6 +23,7 @@
 #include "Ble_composite_dev.h"
 #include "kbd_if.h"
 #include "keyboard_api.h"
+#include "Time_counter.h"
 
 #define BLE_CONNECTIONS_COUNT   5
 #define BLE_ADDRESS_LEN         6
@@ -99,7 +100,7 @@ class BleManager
     struct ConnectionKeyState
     {
         bool longPress;
-        uint64_t timePressed;
+        dl_timer_t pressedTimer;
     };
     ConnectionKeyState connectionState[BLE_CONNECTIONS_COUNT];
 
@@ -114,10 +115,10 @@ class BleManager
 
     bool trigger_save_conn_timer = false;
     bool timer_save_conn_start_count = false;
-    uint32_t ti_save_new_conn = 0;
+    dl_timer_t timer_save_new_conn = 0;
 
     bool timer_save_name_start_count = false;
-    uint32_t ti_save_new_name = 0;
+    dl_timer_t timer_save_new_name = 0;
 
     kbdif_t * p_kbdif = NULL;
     kbdapi_key_report_lock_t kbdapi_key_report_lock;

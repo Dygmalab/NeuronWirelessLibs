@@ -173,6 +173,8 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
 INLINE void ConfigManager::machine_state_set( config_state_t state )
 {
     machine_state = state;
+
+    mcu_sleep_postpone();
 }
 
 INLINE void ConfigManager::machine_state_idle( void )
