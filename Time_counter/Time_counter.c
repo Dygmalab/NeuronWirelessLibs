@@ -47,8 +47,8 @@
 #define TIMER_SYSTIM_TICK_LSB_MASK      0x7FFFFFFF              /* This is the mask of the hardware counter register value */
 #define TIMER_SYSTIM_TICK_OVFLW_VAL     0x80000000              /* The value of the tick counter if it did not overflow to 0x00000000 */
 
-#define SYSTIM_US_TO_TICK_CNT( us )     ( us * TIMER_FREQUENCY_IN_MHZ )
-#define SYSTIM_MS_TO_TICK_CNT( ms )     SYSTIM_US_TO_TICK_CNT( ms * 1000 )
+#define SYSTIM_US_TO_TICK_CNT( us )     ( (systim_tick_t)us * TIMER_FREQUENCY_IN_MHZ )
+#define SYSTIM_MS_TO_TICK_CNT( ms )     SYSTIM_US_TO_TICK_CNT( (systim_tick_t)ms * 1000 )
 
 #define SYSTIM_TICK_CNT_TO_US(ticks)    ( ticks / TIMER_FREQUENCY_IN_MHZ )
 #define SYSTIM_TICK_CNT_TO_MS(ticks)    ( SYSTIM_TICK_CNT_TO_US( ticks ) / 1000 )
