@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 
-#define TWI_DEBUG                   1
+#define TWI_DEBUG                   0
 #define TWI_PRINT_RECEIVED_BUFF     0
 
 class Wire
