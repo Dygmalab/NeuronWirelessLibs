@@ -117,7 +117,7 @@ result_t Battery::init()
 
         uint16_t battery_level_mv;
         memcpy(&battery_level_mv, &packet.data[1], sizeof(battery_level_mv));
-        ble_battery_level_update(min(battery_level_left, battery_level_right));
+        BleManager.battery_level_update(min(battery_level_left, battery_level_right));
 
         #if DEBUG_LOG_BATTERY_MANAGER
         NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
@@ -148,7 +148,7 @@ result_t Battery::init()
             right.startDisconnect();
         }
 
-        ble_battery_level_update(min(battery_level_left, battery_level_right));
+        BleManager.battery_level_update(min(battery_level_left, battery_level_right));
     }));
 
     Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {

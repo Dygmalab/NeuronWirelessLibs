@@ -25,7 +25,7 @@ THE SOFTWARE.
 
 
 #include "hidDefy.h"
-#include "Ble_composite_dev.h"
+#include "Ble_manager.h"
 #include "DescriptorPrimitives.h"
 #include "HIDAliases.h"
 #include "HIDReportObserver.h"
@@ -104,7 +104,7 @@ int HID_::SendReport_(uint8_t id, const void *data, int len)
     {
         TinyUSBDevice.remoteWakeup();
     }
-    else if (TinyUSBDevice.mounted() || ble_connected())
+    else if (TinyUSBDevice.mounted() || BleManager.is_connected())
     {
         NextReport nextReport{id, static_cast<uint16_t>(len)};
         tu_fifo_write_n(&tx_ff_hid, &nextReport, (uint16_t)(sizeof(nextReport)));
@@ -132,12 +132,12 @@ bool HID_::SendLastReport()
         tu_fifo_peek_n(&tx_ff_hid, &nextReportWithData.nextReport, (uint16_t)(sizeof(nextReportWithData.nextReport)));
         tu_fifo_peek_n(&tx_ff_hid, &nextReportWithData, (uint16_t)(sizeof(nextReportWithData.nextReport)) + nextReportWithData.nextReport.len);
 
-        if (ble_connected())
+        if (BleManager.is_connected())
             success = ble_send_report(nextReportWithData.nextReport.id, (uint8_t *const)nextReportWithData.dataReport, nextReportWithData.nextReport.len);
         else
             success = usb_hid.sendReport(nextReportWithData.nextReport.id, nextReportWithData.dataReport, nextReportWithData.nextReport.len);
 
-        if (success || (ble_innited() && !ble_connected()) || (!ble_innited() && TinyUSBDevice.suspended()))
+        if (success || (BleManager.is_enabled() && !BleManager.is_connected()) || (!BleManager.is_enabled() && TinyUSBDevice.suspended()))
         {
             tu_fifo_advance_read_pointer(&tx_ff_hid, (uint16_t)(sizeof(nextReportWithData.nextReport)) + nextReportWithData.nextReport.len);
         }
