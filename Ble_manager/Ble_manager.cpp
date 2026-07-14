@@ -872,59 +872,59 @@ kbdapi_event_result_t BleManager::kbdif_key_event_cb( void * p_instance, kbdapi_
 
 kbdapi_event_result_t BleManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
 {
-    //    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
-    //
-    //    if (strncmp(command, "wireless.bluetooth.", 19) != 0) return EventHandlerResult::OK;
-    //    if (strcmp(command + 19, "devicesMap") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //            for (const auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.send();
-    //            }
-    //        }
-    //        else
-    //        {
-    //            for (auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.read();
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
-    //
-    //    // This command need reset
-    //    if (strcmp(command + 19, "deviceName") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //            BLE_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
-    //
-    //            for (const auto &device_name_letter : ble_flash_data.device_name_local)
-    //            {
-    //                ::Focus.send((uint8_t)device_name_letter);
-    //            }
-    //        }
-    //        else
-    //        {
-    //            BLE_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
-    //
-    //            for (auto &device_name_letter : ble_flash_data.device_name_local)
-    //            {
-    //                uint8_t aux;
-    //                ::Focus.read(aux);
-    //                device_name_letter = (char)aux;
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
+//    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
+//
+//    if (strncmp(command, "wireless.bluetooth.", 19) != 0) return EventHandlerResult::OK;
+//    if (strcmp(command + 19, "devicesMap") == 0)
+//    {
+//        if (::Focus.isEOL())
+//        {
+//            for (const auto &connection : ble_flash_data.ble_connections)
+//            {
+//                connection.send();
+//            }
+//        }
+//        else
+//        {
+//            for (auto &connection : ble_flash_data.ble_connections)
+//            {
+//                connection.read();
+//            }
+//
+//            // Save it in flash memory.
+//            Runtime.storage().put(flash_base_addr, ble_flash_data);
+//            Runtime.storage().commit();
+//        }
+//    }
+//
+//    // This command need reset
+//    if (strcmp(command + 19, "deviceName") == 0)
+//    {
+//        if (::Focus.isEOL())
+//        {
+//            BLE_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
+//
+//            for (const auto &device_name_letter : ble_flash_data.device_name_local)
+//            {
+//                ::Focus.send((uint8_t)device_name_letter);
+//            }
+//        }
+//        else
+//        {
+//            BLE_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
+//
+//            for (auto &device_name_letter : ble_flash_data.device_name_local)
+//            {
+//                uint8_t aux;
+//                ::Focus.read(aux);
+//                device_name_letter = (char)aux;
+//            }
+//
+//            // Save it in flash memory.
+//            Runtime.storage().put(flash_base_addr, ble_flash_data);
+//            Runtime.storage().commit();
+//        }
+//    }
 
     // return EventHandlerResult::EVENT_CONSUMED;
     return KBDAPI_EVENT_RESULT_IGNORED;
