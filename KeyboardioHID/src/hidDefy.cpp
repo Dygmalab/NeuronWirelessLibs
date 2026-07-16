@@ -133,7 +133,7 @@ bool HID_::SendLastReport()
         tu_fifo_peek_n(&tx_ff_hid, &nextReportWithData, (uint16_t)(sizeof(nextReportWithData.nextReport)) + nextReportWithData.nextReport.len);
 
         if (BleManager.is_connected())
-            success = ble_send_report(nextReportWithData.nextReport.id, (uint8_t *const)nextReportWithData.dataReport, nextReportWithData.nextReport.len);
+            success = blehid_send_report(nextReportWithData.nextReport.id, (uint8_t *const)nextReportWithData.dataReport, nextReportWithData.nextReport.len);
         else
             success = usb_hid.sendReport(nextReportWithData.nextReport.id, nextReportWithData.dataReport, nextReportWithData.nextReport.len);
 
@@ -168,7 +168,7 @@ int HID_::begin()
     /* Set the BLE HID report descriptor */
     hid_report_descriptor_ble_get( &p_descriptor, &descriptor_len );
 
-    ble_set_report_descriptor(p_descriptor, descriptor_len);
+    blehid_set_report_descriptor(p_descriptor, descriptor_len);
 
     return 0;
 }

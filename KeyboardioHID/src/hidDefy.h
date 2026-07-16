@@ -33,7 +33,7 @@ THE SOFTWARE.
 
 #include "DescriptorPrimitives.h"
 #include "MultiReport/Keyboard.h"
-#include "ble_hid_service.h"
+#include "ble_types.h"
 
 
 #define _USING_HID
@@ -96,6 +96,7 @@ enum
     RAW_USAGE_ANSI = 0x01,
     RAW_USAGE_ISO = 0x02,
     RAW_USAGE_DEFY = 0x03,
+    RAW_USAGE_SONSEI = 0x04
 };
 #else
 
@@ -103,6 +104,7 @@ enum
 #define RAW_USAGE_ANSI      0x01
 #define RAW_USAGE_ISO       0x01
 #define RAW_USAGE_DEFY      0x01
+#define RAW_USAGE_SONSEI    0x01
 
 #endif
 
@@ -228,7 +230,7 @@ HID_COLLECTION_END                            \
     TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)),                                                                                  \
     TUD_HID_REPORT_DESC_CONSUMER_DYGMA(HID_REPORT_ID(REPORT_ID_CONSUMER_CONTROL)),                                                              \
     TUD_HID_REPORT_DESC_SYSTEM_CONTROL(HID_REPORT_ID(REPORT_ID_SYSTEM_CONTROL)),                                                                \
-    TUD_HID_REPORT_DESC_GENERIC_INOUT_DYGMA(OUTPUT_REPORT_LEN_RAW, usage_raw, HID_REPORT_ID(REPORT_ID_RAW))                                                      \
+    TUD_HID_REPORT_DESC_GENERIC_INOUT_DYGMA(BLE_OUTPUT_REPORT_LEN_RAW, usage_raw, HID_REPORT_ID(REPORT_ID_RAW))                                                      \
 }
 
 #endif // HID_h
