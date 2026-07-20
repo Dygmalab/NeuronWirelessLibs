@@ -148,9 +148,9 @@ class BleManager
     bool_t enable_request_flag;
     bool_t enabled_flag;
 
-    void channel_init( const channel_t * p_channel );
+    result_t channel_init( const channel_t * p_channel );
+    result_t channels_init( void );
     void channel_paired_set( const channel_t * p_channel, bool paired );
-    void channels_init( void );
 
     result_t ble_ll_init( void );
     void ble_ll_whitelist_configure( void );

@@ -188,13 +188,35 @@ void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_t event )
 /*                             Channels                             */
 /********************************************************************/
 
-void BleManager::channel_init( const channel_t * p_channel )
+result_t BleManager::channel_init( const channel_t * p_channel )
 {
     bool_t channel_paired = ( p_channel->peer_id == PM_PEER_ID_INVALID ) ? false : true;
 
     channel_paired_set( p_channel, channel_paired );
 
     BLE_LOG_DEBUG("Ble_manager: Channel %i -> %d", p_channel->id, channel_paired );
+
+    return RESULT_OK;
+}
+
+result_t BleManager::channels_init( void )
+{
+    result_t result = RESULT_ERR;
+    uint8_t i;
+
+    for ( i = 0; i < BLE_CHANNELS_COUNT; i++ )
+    {
+        result = channel_init( &p_config->channels[i] );
+        EXIT_IF_ERR( result, "channel_init failed" );
+    }
+
+    BLE_LOG_DEBUG("Ble_manager: %i channels in total.", i);
+
+    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+    LEDBluetoothPairingDefy.setEreaseDone(false);
+
+_EXIT:
+    return result;
 }
 
 void BleManager::channel_paired_set( const channel_t * p_channel, bool paired )
@@ -211,20 +233,6 @@ void BleManager::channel_paired_set( const channel_t * p_channel, bool paired )
     }
 
     LEDBluetoothPairingDefy.setPairedChannels( channels_paired_mask );
-}
-
-void BleManager::channels_init( void )
-{
-    uint8_t i;
-    for ( i = 0; i < BLE_CHANNELS_COUNT; i++ )
-    {
-        channel_init( &p_config->channels[i] );
-    }
-
-    BLE_LOG_DEBUG("Ble_manager: %i channels in total.", i);
-
-    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-    LEDBluetoothPairingDefy.setEreaseDone(false);
 }
 
 //void BleManager::update_channel_and_name(void)
@@ -1075,7 +1083,13 @@ result_t BleManager::init()
     BLE_LOG_DEBUG("Ble_manager: Current channel %i", p_config->current_channel_id);
 
     /* Initialize the Low Level BLE */
-    ble_ll_init();
+    result = ble_ll_init();
+    EXIT_IF_ERR( result, "ble_ll_init failed" );
+
+    /* Initialize the channels */
+    result = channels_init();
+    EXIT_IF_ERR( result, "channels_init failed" );
+
 //    update_channel_and_name();
 
     /* Initialize the flags */
