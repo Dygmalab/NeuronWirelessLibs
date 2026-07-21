@@ -1234,6 +1234,8 @@ bool BleManager::force_ble_get( void )
 
 void BleManager::run()
 {
+    blecdev_run();
+
     state_machine();
 }
 
