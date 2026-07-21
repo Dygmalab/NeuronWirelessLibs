@@ -22,8 +22,8 @@
 //#include "keyboard_api.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 //#include "LEDManager.h"
-//#include "FirmwareVersion.h"
-//
+#include "FirmwareVersion.h"
+
 //#include "Do_once.h"
 #include "kbd_if_manager.h"
 
@@ -564,7 +564,12 @@ inline void BleManager::state_set( blem_state_t blem_state )
 
 inline void BleManager::state_disabled_process()
 {
-    if( enable_request_flag == true )
+    if( FirmwareVersion::keyboard_is_wireless() == false )
+    {
+        /* The keyboard setup is not wireless */
+        return;
+    }
+    else if( enable_request_flag == true )
     {
         enable_request_flag = false;
         state_set( BLEM_STATE_ENABLE );
