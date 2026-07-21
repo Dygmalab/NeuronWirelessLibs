@@ -125,6 +125,7 @@ class BleManager
 
     result_t kbdif_initialize(void);
     kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
+    kbdapi_event_result_t kbdif_command_event_process( const char * p_command );
 
     void timer_save_conn_run(uint32_t timeout_ms);
     void save_connection(void);
@@ -136,6 +137,7 @@ class BleManager
 
     void set_channel_in_use( kbdapi_key_t * p_key_);
     void erase_paired_device(uint8_t index_channel);
+    void change_channel(uint8_t index_channel);
     bool is_num_key(kbdapi_key_t * p_key);
     char raw_key_to_ascii(kbdapi_key_t * p_key);
     void update_channel_and_name(void);

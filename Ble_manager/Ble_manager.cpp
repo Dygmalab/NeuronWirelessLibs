@@ -22,6 +22,7 @@
 #include "Config_manager.h"
 #include "kaleidoscope/Runtime.h"
 #include "keyboard_api.h"
+#include "Kaleidoscope-FocusSerial.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
 #include "LEDManager.h"
 #include "FirmwareVersion.h"
@@ -432,6 +433,68 @@ void BleManager::erase_paired_device(uint8_t index_channel)
     }
 }
 
+void BleManager::change_channel(uint8_t index_channel)
+{
+    /*
+        Switch the active Bluetooth channel. This is the exact procedure that
+        runs when the user selects a channel with a number key while in
+        pairing mode; it is shared between the key handler and the
+        wireless.bluetooth.channel Focus command.
+    */
+
+#if BLE_MANAGER_DEBUG_LOG
+    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", p_connections_config->current_channel, index_channel);
+#endif
+
+    cfgmem_current_channel_save( index_channel );
+    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+    LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
+    send_led_mode();
+    update_channel_and_name();
+
+    // First we disable scanning and advertising.
+    ble_adv_stop();
+    delay(200);
+
+    // Save it in flash memory - In this case, the data need to be saved instantly and not when the standard save timeout expires
+    ConfigManager.config_save_now();
+
+    update_current_channel();
+    delay(200);
+
+    // Try to change the channel.
+    ble_disconnect();
+    delay(200);
+
+    // Try to reconnect again.
+    gap_params_init();
+    delay(200);
+
+    ble_adv_stop();
+    advertising_init();
+    delay(200);
+
+    /*
+        If it doesn't have any device paired on the channel, it goes into
+        advertising with a whitelist so that any device can find it.
+    */
+    pm_peer_id_t active_connection_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
+    if (active_connection_peer_id == PM_PEER_ID_INVALID)
+    {
+#if BLE_MANAGER_DEBUG_LOG
+        NRF_LOG_INFO("Ble_manager: Whitelist deactivated.");
+#endif
+        ble_goto_advertising_mode();
+    }
+    else
+    {
+#if BLE_MANAGER_DEBUG_LOG
+        NRF_LOG_INFO("Ble_manager: Whitelist activated.");
+#endif
+        ble_goto_white_list_advertising_mode();
+    }
+}
+
 void BleManager::bt_layer_enter(void)
 {
     /* Start the Bluetooth led effect */
@@ -792,57 +855,7 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
                 // NRF_LOG_DEBUG(" ble_is_advertising_mode(): %i", ble_is_advertising_mode());
                 if (p_connections_config->current_channel != index_channel)
                 {
-#if BLE_MANAGER_DEBUG_LOG
-                    NRF_LOG_DEBUG("Ble_manager: Changing channel %i to %i", p_connections_config->current_channel, index_channel);
-#endif
-
-                    cfgmem_current_channel_save( index_channel );
-                    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
-                    LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
-                    send_led_mode();
-                    update_channel_and_name();
-
-                    // First we disable scanning and advertising.
-                    ble_adv_stop();
-                    delay(200);
-
-                    // Save it in flash memory - In this case, the data need to be saved instantly and not when the standard save timeout expires
-                    ConfigManager.config_save_now();
-
-                    update_current_channel();
-                    delay(200);
-
-                    // Try to change the channel.
-                    ble_disconnect();
-                    delay(200);
-
-                    // Try to reconnect again.
-                    gap_params_init();
-                    delay(200);
-
-                    ble_adv_stop();
-                    advertising_init();
-                    delay(200);
-
-                    /*
-                        If it doesn't have any device paired on the channel, it goes into
-                        advertising with a whitelist so that any device can find it.
-                    */
-                    pm_peer_id_t active_connection_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
-                    if (active_connection_peer_id == PM_PEER_ID_INVALID)
-                    {
-#if BLE_MANAGER_DEBUG_LOG
-                        NRF_LOG_INFO("Ble_manager: Whitelist deactivated.");
-#endif
-                        ble_goto_advertising_mode();
-                    }
-                    else
-                    {
-#if BLE_MANAGER_DEBUG_LOG
-                        NRF_LOG_INFO("Ble_manager: Whitelist activated.");
-#endif
-                        ble_goto_white_list_advertising_mode();
-                    }
+                    change_channel(index_channel);
 
                     result = KBDAPI_EVENT_RESULT_CONSUMED;
                 }
@@ -868,68 +881,60 @@ kbdapi_event_result_t BleManager::kbdif_key_event_cb( void * p_instance, kbdapi_
     return p_BleManager->kbdif_key_event_process( p_key );
 }
 
+kbdapi_event_result_t BleManager::kbdif_command_event_process( const char * p_command )
+{
+    if (::Focus.handleHelp(p_command, "wireless.bluetooth.channel"))
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strncmp(p_command, "wireless.bluetooth.", 19) != 0)
+    {
+        return KBDAPI_EVENT_RESULT_IGNORED;
+    }
+
+    if (strcmp(p_command + 19, "channel") == 0)
+    {
+        if (::Focus.isEOL())
+        {
+            /* Read request: current channel, 1-based to match the keycaps. */
+            ::Focus.send<uint8_t>((uint8_t)(p_connections_config->current_channel + 1));
+        }
+        else
+        {
+            /*
+                Write request: switch to the given channel (1..BLE_CONNECTIONS_COUNT).
+                Same procedure as selecting the channel with a number key in pairing
+                mode. Note for hosts connected over Bluetooth: the link drops while
+                switching away, so the Focus reply may never reach them - the switch
+                itself still completes.
+            */
+            uint8_t channel = 0;
+            ::Focus.read(channel);
+
+            if (channel >= 1 && channel <= BLE_CONNECTIONS_COUNT &&
+                ble_innited() && FirmwareVersion::keyboard_is_wireless())
+            {
+                uint8_t index_channel = channel - 1;
+
+                if (p_connections_config->current_channel != index_channel)
+                {
+                    change_channel(index_channel);
+                }
+            }
+        }
+
+        return KBDAPI_EVENT_RESULT_CONSUMED;
+    }
+
+    return KBDAPI_EVENT_RESULT_IGNORED;
+}
+
 kbdapi_event_result_t BleManager::kbdif_command_event_cb( void * p_instance, const char * p_command )
 {
-    //    if (::Focus.handleHelp(command, "wireless.bluetooth.devicesMap\nwireless.bluetooth.deviceName")) return EventHandlerResult::OK;
-    //
-    //    if (strncmp(command, "wireless.bluetooth.", 19) != 0) return EventHandlerResult::OK;
-    //    if (strcmp(command + 19, "devicesMap") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //            for (const auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.send();
-    //            }
-    //        }
-    //        else
-    //        {
-    //            for (auto &connection : ble_flash_data.ble_connections)
-    //            {
-    //                connection.read();
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
-    //
-    //    // This command need reset
-    //    if (strcmp(command + 19, "deviceName") == 0)
-    //    {
-    //        if (::Focus.isEOL())
-    //        {
-    //#if BLE_MANAGER_DEBUG_LOG
-    //            NRF_LOG_DEBUG("read request: wireless.bluetooth.deviceName");
-    //#endif
-    //
-    //            for (const auto &device_name_letter : ble_flash_data.keyb_ble_name)
-    //            {
-    //                ::Focus.send((uint8_t)device_name_letter);
-    //            }
-    //        }
-    //        else
-    //        {
-    //#if BLE_MANAGER_DEBUG_LOG
-    //            NRF_LOG_DEBUG("write request: wireless.bluetooth.deviceName");
-    //#endif
-    //
-    //            for (auto &device_name_letter : ble_flash_data.keyb_ble_name)
-    //            {
-    //                uint8_t aux;
-    //                ::Focus.read(aux);
-    //                device_name_letter = (char)aux;
-    //            }
-    //
-    //            // Save it in flash memory.
-    //            Runtime.storage().put(flash_base_addr, ble_flash_data);
-    //            Runtime.storage().commit();
-    //        }
-    //    }
+    BleManager * p_BleManager = ( BleManager *)p_instance;
 
-    // return EventHandlerResult::EVENT_CONSUMED;
-    return KBDAPI_EVENT_RESULT_IGNORED;
+    return p_BleManager->kbdif_command_event_process( p_command );
 }
 
 const kbdif_handlers_t BleManager::kbdif_handlers =
