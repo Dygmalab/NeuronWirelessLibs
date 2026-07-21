@@ -583,6 +583,10 @@ inline void BleManager::state_enable_process()
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_enable failed" );
     EXIT_IF_ERR( result, "blecdev_enable failed" );
 
+    result = blecdev_adv_start_whitelist();
+    ASSERT_DYGMA( result == RESULT_OK, "blecdev_adv_start_whitelist failed" );
+    EXIT_IF_ERR( result, "blecdev_adv_start_whitelist failed" );
+
     state_set( BLEM_STATE_ENABLING );
 
 _EXIT:
