@@ -35,6 +35,7 @@ class ConfigManager
             CFG_ITEM_TYPE_LEDS_LEDMANAGER = 10,
             CFG_ITEM_TYPE_LEDS_PALETTE,
             CFG_ITEM_TYPE_LEDS_COLORMAP,
+            CFG_ITEM_TYPE_LEDS_CAPS_LOCK_INDICATOR,
 
             CFG_ITEM_TYPE_BATTERY = 20,
 
