@@ -21,7 +21,7 @@
 //#include "kaleidoscope/Runtime.h"
 //#include "keyboard_api.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
-//#include "LEDManager.h"
+#include "LEDManager.h"
 #include "FirmwareVersion.h"
 
 //#include "Do_once.h"
@@ -166,10 +166,25 @@ void BleManager::ble_ll_whitelist_configure( void )
 //    }
 }
 
-void BleManager::ble_ll_event_process( blecdev_event_t event )
+void BleManager::ble_ll_event_type_advertising_process( void )
 {
-    switch( event )
+    /* Activate the HMI */
+    hmi_activate();
+
+    /* Set the advertising state */
+    state_set( BLEM_STATE_ADVERTISING );
+}
+
+void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
+{
+    switch( event_type )
     {
+        case BLECDEV_EVENT_TYPE_ADVERTISING:
+
+            ble_ll_event_type_advertising_process();
+
+            break;
+
         default:
 
             ASSERT_DYGMA( false, "Unhandled BLE Composite Device event" )
@@ -178,10 +193,10 @@ void BleManager::ble_ll_event_process( blecdev_event_t event )
     }
 }
 
-void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_t event )
+void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type )
 {
     BleManager * p_bleManager = (BleManager *)p_instance;
-    p_bleManager->ble_ll_event_process( event );
+    p_bleManager->ble_ll_event_process( event_type );
 }
 
 /********************************************************************/
@@ -524,6 +539,338 @@ void BleManager::channel_paired_set( const channel_t * p_channel, bool paired )
 //    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, true );
 //}
 //
+//void BleManager::set_bt_name_from_specifications(const char *spec)
+//{
+//    ble_device_name = spec;
+//}
+
+/****************************************************/
+/*                   State machine                  */
+/****************************************************/
+
+inline void BleManager::state_set( blem_state_t blem_state )
+{
+    this->state = blem_state;
+    mcu_sleep_postpone();
+}
+
+inline void BleManager::state_disabled_process( void )
+{
+    if( FirmwareVersion::keyboard_is_wireless() == false )
+    {
+        /* The keyboard setup is not wireless */
+        return;
+    }
+    else if( enable_request_flag == true )
+    {
+        enable_request_flag = false;
+        state_set( BLEM_STATE_ENABLE );
+        return;
+    }
+}
+
+inline void BleManager::state_enable_process( void )
+{
+    result_t result = RESULT_ERR;
+    blecdev_enable_conf_t enable_config;
+
+    enable_config.current_channel_id = p_config->current_channel_id;
+
+    /* Enable the HMI machine */
+    hmi_enable();
+
+    result = blecdev_enable( &enable_config );
+    ASSERT_DYGMA( result == RESULT_OK, "blecdev_enable failed" );
+    EXIT_IF_ERR( result, "blecdev_enable failed" );
+
+    result = blecdev_adv_start_whitelist();
+    ASSERT_DYGMA( result == RESULT_OK, "blecdev_adv_start_whitelist failed" );
+    EXIT_IF_ERR( result, "blecdev_adv_start_whitelist failed" );
+
+    state_set( BLEM_STATE_ENABLED );
+
+_EXIT:
+    return;
+}
+
+inline void BleManager::state_disable_process( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Enable the HMI machine */
+    hmi_disable();
+
+    result = blecdev_disable();
+    ASSERT_DYGMA( result == RESULT_OK, "blecdev_disable failed" );
+    EXIT_IF_ERR( result, "blecdev_disable failed" );
+
+    state_set( BLEM_STATE_DISABLED );
+
+    /* Check if the BLE module is being restarted */
+    if( restart_flag == true )
+    {
+        result = enable();
+        ASSERT_DYGMA( result == RESULT_OK, "The BLE enable should always work at this point" );
+    }
+
+_EXIT:
+    return;
+}
+
+inline void BleManager::state_machine( void )
+{
+    switch( state )
+    {
+        case BLEM_STATE_DISABLED:
+
+            state_disabled_process();
+
+            break;
+
+        case BLEM_STATE_ENABLE:
+
+            state_enable_process();
+
+            break;
+
+        case BLEM_STATE_ENABLED:
+            break;
+
+        case BLEM_STATE_ADVERTISING:
+            break;
+
+//        case BLEM_STATE_CONNECTED:
+//            break;
+
+        case BLEM_STATE_DISABLE:
+
+            state_disable_process();
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhanled BLE Manager state" );
+
+            break;
+    }
+}
+
+/****************************************************/
+/*                    HMI machine                   */
+/****************************************************/
+
+inline void BleManager::hmi_state_set( blem_hmi_state_t blem_hmi_state )
+{
+    this->hmi_state = blem_hmi_state;
+    mcu_sleep_postpone();
+}
+
+//void BleManager::bt_layer_enter(void)
+//{
+//    /* Start the Bluetooth led effect */
+//    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+//
+//    /* Disable the keyboard key reporting */
+//    kbdapi_key_report_disable( &kbdapi_key_report_lock );
+//
+//    showing_bt_layer = true;
+//}
+//
+//void BleManager::bt_layer_exit(void)
+//{
+//    showing_bt_layer = false;
+//
+//    /* Exit the Bluetooth led effect */
+//    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
+//    LEDManager.led_effect_reset_prio();
+//    LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
+//
+//    /* Re-enable the keyboard key reporting */
+//    kbdapi_key_report_enable( &kbdapi_key_report_lock );
+//}
+
+
+inline void BleManager::hmi_state_enabled_set( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Re-enable the keyboard key reporting */
+    result = kbdapi_key_report_enable( &kbdapi_key_report_lock );
+    ASSERT_DYGMA( result == RESULT_OK, "kbdapi_key_report_enable failed" );
+    EXIT_IF_ERR( result, "kbdapi_key_report_enable failed" );
+
+    /* Exit the Bluetooth led effect */
+    LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
+    LEDManager.led_effect_reset_prio();
+    LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
+
+    /* Go to the Enabled state */
+    hmi_deactivate_req_flag = false;
+    hmi_active_flag = false;
+    hmi_state_set( BLEM_HMI_STATE_ENABLED );
+
+_EXIT:
+    return;
+}
+
+inline void BleManager::hmi_state_disabled_set( void )
+{
+    /* First, make sure the HMI is de-activated */
+    hmi_state_enabled_set();
+
+    /* De-assert all the HMI controlling flags */
+    hmi_activate_req_flag = false;
+    hmi_deactivate_req_flag = false;
+    hmi_active_flag = false;
+
+    /* Now move to the disabled state */
+    hmi_state_set( BLEM_HMI_STATE_DISABLED );
+}
+
+inline void BleManager::hmi_state_active_set( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Disable the keyboard key reporting */
+    result = kbdapi_key_report_disable( &kbdapi_key_report_lock );
+    ASSERT_DYGMA( result == RESULT_OK, "kbdapi_key_report_disable failed" );
+    EXIT_IF_ERR( result, "kbdapi_key_report_disable failed" );
+
+    /* Start the Bluetooth led effect */
+    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+
+    /* Go to the Active state */
+    hmi_activate_req_flag = false;
+    hmi_active_flag = true;
+    hmi_state_set( BLEM_HMI_STATE_ACTIVE );
+
+_EXIT:
+    return;
+}
+
+inline void BleManager::hmi_state_enabled_process( void )
+{
+    if( hmi_activate_req_flag == true )
+    {
+        hmi_state_active_set();
+        return;
+    }
+}
+
+inline void BleManager::hmi_state_active_process( void )
+{
+    if( hmi_deactivate_req_flag == true )
+    {
+        hmi_state_enabled_set();
+        return;
+    }
+}
+
+inline void BleManager::hmi_state_machine( void )
+{
+    switch( hmi_state )
+    {
+        case BLEM_HMI_STATE_DISABLED:
+
+            /* Waiting for the HMI enable function call */
+
+            break;
+
+        case BLEM_HMI_STATE_ENABLED:
+
+            hmi_state_enabled_process();
+
+            break;
+
+        case BLEM_HMI_STATE_ACTIVE:
+
+            hmi_state_active_process();
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled BLE HMI state" );
+
+            break;
+    }
+}
+
+inline void BleManager::hmi_enable( void )
+{
+    if( hmi_is_enabled() == true )
+    {
+        /* Already enabled */
+        return;
+    }
+
+    hmi_state_enabled_set();
+}
+
+inline void BleManager::hmi_disable( void )
+{
+    if( hmi_is_enabled() == false )
+    {
+        /* Already disabled */
+        return;
+    }
+
+    hmi_state_disabled_set();
+}
+
+inline void BleManager::hmi_activate( void )
+{
+    if( hmi_is_enabled() == false )
+    {
+        ASSERT_DYGMA( false, "BLE HMI trying to activate from invalid state" );
+        return;
+    }
+
+    hmi_activate_req_flag = true;
+}
+
+inline void BleManager::hmi_deactivate( void )
+{
+    ASSERT_DYGMA( hmi_is_active(), "BLE HMI trying to deactivate from invalid state" );
+
+    hmi_deactivate_req_flag = true;
+}
+
+inline bool BleManager::hmi_is_enabled( void )
+{
+    return ( hmi_state == BLEM_HMI_STATE_DISABLED ) ? false : true;
+}
+
+inline bool BleManager::hmi_is_active( void )
+{
+    return hmi_active_flag;
+}
+
+inline result_t BleManager::hmi_channel_resolve( uint8_t * p_channel_id, kbdapi_key_t * p_key )
+{
+    const int colMapping[5][2] =
+    {
+        {1, 10},
+        {2, 11},
+        {3, 12},
+        {4, 13},
+        {5, 14}
+    };
+
+    for ( uint8_t i = 0; i < 5; i++ )
+    {
+        if ( ( p_key->coord.col == colMapping[i][0] || p_key->coord.col == colMapping[i][1] ) &&
+             ( p_key->coord.row == 0                || p_key->coord.row == 1 ) )
+        {
+            *p_channel_id = i;
+            return RESULT_OK;
+        }
+    }
+
+    return RESULT_ERR;
+}
+
 //void BleManager::set_channel_in_use( kbdapi_key_t * p_key )
 //{
 //    const int colMapping[5][2] =
@@ -546,100 +893,109 @@ void BleManager::channel_paired_set( const channel_t * p_channel, bool paired )
 //        }
 //    }
 //}
-//
-//void BleManager::set_bt_name_from_specifications(const char *spec)
-//{
-//    ble_device_name = spec;
-//}
 
-/****************************************************/
-/*                   State machine                  */
-/****************************************************/
-
-inline void BleManager::state_set( blem_state_t blem_state )
+inline void BleManager::hmi_channel_change( uint8_t channel_id )
 {
-    this->state = blem_state;
-    mcu_sleep_postpone();
-}
-
-inline void BleManager::state_disabled_process()
-{
-    if( FirmwareVersion::keyboard_is_wireless() == false )
+    if( channel_id == p_config->current_channel_id )
     {
-        /* The keyboard setup is not wireless */
+        /* If the the BLE is connected via this channel, then deactivate the HMI and continue with normal BLE operation */
+        if( is_connected() == true )
+        {
+            hmi_deactivate();
+        }
+
+        /* Leave the function as the channel is not being changed */
         return;
     }
-    else if( enable_request_flag == true )
-    {
-        enable_request_flag = false;
-        state_set( BLEM_STATE_ENABLE );
-        return;
-    }
+
+    /* Save the new channel id */
+    cfgmem_current_channel_id_save( channel_id );
+
+    /* Update the Bluetooth led effect */
+    LEDBluetoothPairingDefy.setConnectedChannel( NOT_CONNECTED );
+    LEDBluetoothPairingDefy.setAvertisingModeOn( p_config->current_channel_id );
+
+    /* Reset the BLE connection process */
+#warning "Start the BLE module reset here"
 }
 
-inline void BleManager::state_enable_process()
+inline void BleManager::hmi_channel_erase( uint8_t channel_id )
+{
+
+}
+
+inline result_t BleManager::hmi_key_enabled_process( kbdapi_key_t * p_key )
+{
+#warning "KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING is not processed yet"
+
+    return RESULT_ERR;  /* The key is ignored */
+}
+
+inline result_t BleManager::hmi_key_active_process( kbdapi_key_t * p_key )
 {
     result_t result = RESULT_ERR;
-    blecdev_enable_conf_t enable_config;
+    uint8_t channel_id;
 
-    enable_config.current_channel_id = p_config->current_channel_id;
+    /* Resolve the channel id to be used */
+    result = hmi_channel_resolve( &channel_id, p_key );
+    EXIT_IF_NOK( result );
 
-    result = blecdev_enable( &enable_config );
-    ASSERT_DYGMA( result == RESULT_OK, "blecdev_enable failed" );
-    EXIT_IF_ERR( result, "blecdev_enable failed" );
+    switch( p_key->coord.row )
+    {
+        case 0:
+            /* Row 0: key 1, key 2, key 3, key 4, key 5, key 6, key 7, key 8, key 9, key 0 */
+            if( p_key->toggled_off == true )
+            {
+                /* Triggering the channel change upon the key release */
+                hmi_channel_change( channel_id );
+            }
+            break;
 
-    result = blecdev_adv_start_whitelist();
-    ASSERT_DYGMA( result == RESULT_OK, "blecdev_adv_start_whitelist failed" );
-    EXIT_IF_ERR( result, "blecdev_adv_start_whitelist failed" );
+        case 1:
+            /* Row 1: key Q, key W, key E, key R, key T, key Y, key U, key I, key O, key PT */
+            hmi_channel_erase( channel_id );
+            break;
 
-    state_set( BLEM_STATE_ENABLING );
+        default:
+            break;
+    }
 
 _EXIT:
-    return;
+    return RESULT_OK; /* The key is always consumed in HMI active state */
 }
 
-inline void BleManager::state_enabling_process()
+inline result_t BleManager::hmi_key_process( kbdapi_key_t * p_key )
 {
-    ASSERT_DYGMA( false, "state_enabling_process not implemented" );
+    result_t result = RESULT_ERR;
 
-    enabled_flag = true;
-    state_set( BLEM_STATE_ENABLED );
-}
-
-inline void BleManager::state_machine()
-{
-    switch( state )
+    /* If the HMI is disabled, just ignore the keypress */
+    if( hmi_is_enabled() == false )
     {
-        case BLEM_STATE_DISABLED:
+        return RESULT_ERR;
+    }
 
-            state_disabled_process();
+    switch( hmi_state )
+    {
+        case BLEM_HMI_STATE_ENABLED:
 
-            break;
-
-        case BLEM_STATE_ENABLE:
-
-            state_enable_process();
-
-            break;
-
-        case BLEM_STATE_ENABLING:
-
-            state_enabling_process();
+            result = hmi_key_enabled_process( p_key );
 
             break;
 
-        case BLEM_STATE_ENABLED:
-            break;
+        case BLEM_HMI_STATE_ACTIVE:
 
-        case BLEM_STATE_DISABLE:
+            result = hmi_key_active_process( p_key );
+
             break;
 
         default:
 
-            ASSERT_DYGMA( false, "Unhanled BLE Manager state" );
+            ASSERT_DYGMA( false, "Keypress in invalid BLE HMI state" );
 
             break;
     }
+
+    return result;
 }
 
 /****************************************************/
@@ -667,9 +1023,13 @@ _EXIT:
     return result;
 }
 
-kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
+inline kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
 {
-    kbdapi_event_result_t result = KBDAPI_EVENT_RESULT_IGNORED;
+    result_t result = RESULT_ERR;
+
+    result = hmi_key_process( p_key );
+
+    return ( result == RESULT_OK ) ? KBDAPI_EVENT_RESULT_CONSUMED : KBDAPI_EVENT_RESULT_IGNORED;
 
 //    /* Exit conditions. */
 //    if (!ble_innited())
@@ -876,9 +1236,220 @@ kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key 
 //            BLE_LOG_FLUSH();
 //        }
 //    }
-
-    return result;
 }
+
+//kbdapi_event_result_t BleManager::kbdif_key_event_process( kbdapi_key_t * p_key )
+//{
+//    kbdapi_event_result_t result = KBDAPI_EVENT_RESULT_IGNORED;
+//
+//    /* Exit conditions. */
+//    if (!ble_innited())
+//    {
+//        if (p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on && FirmwareVersion::keyboard_is_wireless())
+//        {
+//            auto const &keyScanner = kaleidoscope::Runtime.device().keyScanner();
+//            auto isDefyLeftWired = keyScanner.leftSideWiredConnection();
+//            auto isDefyRightWired = keyScanner.rightSideWiredConnection();
+//            auto isWiredMode = isDefyLeftWired || isDefyRightWired;
+//
+//            if (isWiredMode)
+//            {
+//                cfgmem_force_ble_save( true );
+//
+//                set_pairing_key_press(true);
+//
+//                reset_mcu();
+//
+//            }
+//        }
+//        else
+//        {
+//            return KBDAPI_EVENT_RESULT_IGNORED;
+//        }
+//    }
+//
+//    if ( p_key->toggled_off && mitm_activated && is_num_key( p_key ))
+//    {
+//        static uint8_t pin_digits_count = 0;
+//
+//        encryption_pin_number[pin_digits_count] = raw_key_to_ascii(p_key);
+//
+//        BLE_LOG_DEBUG("Ble_manager: encryption_pin_number[%d] = %c",
+//                      pin_digits_count,
+//                      encryption_pin_number[pin_digits_count]);
+//        BLE_LOG_FLUSH();
+//
+//        pin_digits_count++;
+//
+//        if (pin_digits_count == 6) // PIN numbers has 6 digits.
+//        {
+//            BLE_LOG_DEBUG("Ble_manager: Sending pin number..");
+//            BLE_LOG_FLUSH();
+//
+//            pin_digits_count = 0;
+//            ble_send_encryption_pin(encryption_pin_number);
+//            mitm_activated = false;
+//
+//            clear_pin_digits_count.reset();
+//        }
+//        else if (get_flag_security_proc_failed() &&
+//                clear_pin_digits_count.do_once())
+//        {
+//            pin_digits_count = 0;
+//        }
+//
+//        return KBDAPI_EVENT_RESULT_CONSUMED;
+//    }
+//
+//    if ( !ble_is_advertising_mode() && showing_bt_layer && p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
+//    {
+//        exit_pairing_mode();
+//
+//        return KBDAPI_EVENT_RESULT_CONSUMED;
+//    }
+//
+//    if ( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_off )
+//    {
+//        send_led_mode();
+//
+//        return KBDAPI_EVENT_RESULT_CONSUMED;
+//    }
+//
+//    result = KBDAPI_EVENT_RESULT_IGNORED;
+//
+//    if (ble_is_idle())
+//    {
+//        ble_goto_advertising_mode();
+//        LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
+//        send_led_mode();
+//        LEDManager.leds_enable();
+//    }
+//
+//    if (showing_bt_layer)
+//    {
+//        if (((p_key->coord.col == 0 && p_key->coord.row == 0) || (p_key->coord.col == 9 && p_key->coord.row == 0)) && p_key->toggled_on)
+//        {
+//            reset_mcu();
+//        }
+//
+//        /* Erease previous paired channels*/
+//        if (((p_key->coord.col == 1 && p_key->coord.row == 1) ||  // Q key
+//             (p_key->coord.col == 2 && p_key->coord.row == 1) ||  // W key
+//             (p_key->coord.col == 3 && p_key->coord.row == 1) ||  // E key
+//             (p_key->coord.col == 4 && p_key->coord.row == 1) ||  // R key
+//             (p_key->coord.col == 5 && p_key->coord.row == 1) ||  // T key
+//             (p_key->coord.col == 10 && p_key->coord.row == 1) || // Y key
+//             (p_key->coord.col == 11 && p_key->coord.row == 1) || // U key
+//             (p_key->coord.col == 12 && p_key->coord.row == 1) || // I key
+//             (p_key->coord.col == 13 && p_key->coord.row == 1) || // O key
+//             (p_key->coord.col == 14 && p_key->coord.row == 1)))  // PT key
+//        {
+//            set_channel_in_use( p_key );
+//            uint8_t index_channel = channel_in_use;
+//            if ( p_key->toggled_on )
+//            {
+//                timer_set_ms( &connectionState[index_channel].pressedTimer, KEY_ERASE_HOLD_TIMEOUT_MS);
+//            }
+//
+//            if ( p_key->is_pressed && timer_check( &connectionState[index_channel].pressedTimer ) )
+//            {
+//                // TODO: create a led effect to let the user know that the erease was successful
+//                erase_paired_device(index_channel);
+//
+//                result = KBDAPI_EVENT_RESULT_CONSUMED;
+//            }
+//
+//            if ( p_key->toggled_off )
+//            {
+//                connectionState[index_channel].longPress = false;
+//            }
+//        }
+//
+//        /*Change channel in use*/
+//        if (((p_key->coord.col == 1 && p_key->coord.row == 0) ||                                                  // 1 key
+//             (p_key->coord.col == 2 && p_key->coord.row == 0) ||                                                  // 2 key
+//             (p_key->coord.col == 3 && p_key->coord.row == 0) ||                                                  // 3 key
+//             (p_key->coord.col == 4 && p_key->coord.row == 0) ||                                                  // 4 key
+//             (p_key->coord.col == 5 && p_key->coord.row == 0) || (p_key->coord.col == 10 && p_key->coord.row == 0) || // 6 key
+//             (p_key->coord.col == 11 && p_key->coord.row == 0) ||                                                 // 7 key
+//             (p_key->coord.col == 12 && p_key->coord.row == 0) ||                                                 // 8 key
+//             (p_key->coord.col == 13 && p_key->coord.row == 0) ||                                                 // 9 key
+//             (p_key->coord.col == 14 && p_key->coord.row == 0))                                                   // 0 key
+//            && p_key->was_pressed)
+//        {
+//            set_channel_in_use( p_key );
+//
+//            //BLE_LOG_DEBUG("Ble_manager: channel_in_use: %i", channel_in_use);
+//
+//            uint8_t index_channel = channel_in_use;
+//            // Only if the key has not been press for longer than 2 seconds then change the gapAddress
+//            if ( p_key->toggled_off )
+//            {
+//                // BLE_LOG_DEBUG(" ble_is_advertising_mode(): %i", ble_is_advertising_mode());
+//                if (p_connections_config->current_channel != index_channel)
+//                {
+//                    BLE_LOG_DEBUG("Ble_manager: Changing channel %i to %i", p_connections_config->current_channel, index_channel);
+//
+//                    cfgmem_current_channel_save( index_channel );
+//                    LEDBluetoothPairingDefy.setConnectedChannel(NOT_CONNECTED);
+//                    LEDBluetoothPairingDefy.setAvertisingModeOn(p_connections_config->current_channel);
+//                    send_led_mode();
+//                    update_channel_and_name();
+//
+//                    // First we disable scanning and advertising.
+//                    ble_adv_stop();
+//                    delay(200);
+//
+//                    // Save it in flash memory - In this case, the data need to be saved instantly and not when the standard save timeout expires
+//                    ConfigManager.config_save_now();
+//
+//                    update_current_channel();
+//                    delay(200);
+//
+//                    // Try to change the channel.
+//                    ble_disconnect();
+//                    delay(200);
+//
+//                    // Try to reconnect again.
+//                    gap_params_init();
+//                    delay(200);
+//
+//                    ble_adv_stop();
+//                    advertising_init();
+//                    delay(200);
+//
+//                    /*
+//                        If it doesn't have any device paired on the channel, it goes into
+//                        advertising with a whitelist so that any device can find it.
+//                    */
+//                    pm_peer_id_t active_connection_peer_id = p_connections_config->cons[p_connections_config->current_channel].peer_id;
+//                    if (active_connection_peer_id == PM_PEER_ID_INVALID)
+//                    {
+//                        BLE_LOG_INFO("Ble_manager: Whitelist deactivated.");
+//
+//                        ble_goto_advertising_mode();
+//                    }
+//                    else
+//                    {
+//                        BLE_LOG_INFO("Ble_manager: Whitelist activated.");
+//
+//                        ble_goto_white_list_advertising_mode();
+//                    }
+//
+//                    result = KBDAPI_EVENT_RESULT_CONSUMED;
+//                }
+//                else if (p_connections_config->current_channel == index_channel && !ble_is_advertising_mode())
+//                {
+//                    exit_pairing_mode();
+//                }
+//            }
+//
+//            BLE_LOG_FLUSH();
+//        }
+//    }
+//
+//    return result;
+//}
 
 kbdapi_event_result_t BleManager::kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key )
 {
@@ -1103,10 +1674,16 @@ result_t BleManager::init()
 
     /* Initialize the flags */
     enable_request_flag = false;
-    enabled_flag = false;
+//    enabled_flag = false;
+    restart_flag = false;
+
+    hmi_activate_req_flag = false;
+    hmi_deactivate_req_flag = false;
+    hmi_active_flag = false;
 
     /* Set the initial state */
     state = BLEM_STATE_DISABLED;
+    hmi_state = BLEM_HMI_STATE_DISABLED;
 
 //    // UX STUFFf
 //    i = 0;
@@ -1193,7 +1770,7 @@ _EXIT:
 //    return result;
 //}
 
-result_t BleManager::enable()
+result_t BleManager::enable( void )
 {
     if( state != BLEM_STATE_DISABLED )
     {
@@ -1206,9 +1783,48 @@ result_t BleManager::enable()
     return RESULT_OK;
 }
 
+result_t BleManager::disable( void )
+{
+    if( state == BLEM_STATE_DISABLED )
+    {
+        /* The module is already disabled */
+        return RESULT_OK;
+    }
+
+    /* Move directly to the disable state */
+    state_set( BLEM_STATE_DISABLE );
+
+    /* Set the restart flag */
+    restart_flag = true;
+
+    return RESULT_OK;
+}
+
+result_t BleManager::restart( void )
+{
+    result_t result = RESULT_ERR;
+
+    if( state == BLEM_STATE_DISABLED )
+    {
+        ASSERT_DYGMA( false, "Invalid attempt to restart disabled the BLE" );
+        return RESULT_ERR;
+    }
+
+    result = disable();
+    EXIT_IF_ERR( result, "disable failed" );
+
+
+
+_EXIT:
+    return result;
+}
+
 bool_t BleManager::is_enabled( void )
 {
-    return ( enabled_flag == true ) ? true : false;
+#warning "BleManager::is_enabled not implemented"
+    return false;
+
+//    return ( enabled_flag == true ) ? true : false;
 }
 
 bool_t BleManager::is_connected( void )
@@ -1237,6 +1853,7 @@ void BleManager::run()
     blecdev_run();
 
     state_machine();
+    hmi_state_machine();
 }
 
 //void BleManager::run()
