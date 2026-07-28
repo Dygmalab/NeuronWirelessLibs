@@ -20,6 +20,7 @@
 #pragma once
 
 #include "dl_middleware.h"
+#include "EEPROM.h"
 #include "Time_counter.h"
 
 #include "kbd_memory.h"
@@ -63,8 +64,6 @@ class ConfigManager
         result_t config_item_request( cfg_item_type_t item_type, const void ** pp_item );
         result_t config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size );
 
-        void config_save_now( void );
-
         void run( void );
 
     private:
@@ -94,6 +93,19 @@ class ConfigManager
         static result_t kbdmem_ll_item_request_cb( void * p_instance, kbdmem_item_type_t item_type, const void ** pp_item );
         static result_t kbdmem_ll_data_save_cb( void * p_instance, const void * p_mem_target, const void * p_data, uint16_t data_len );
 
+        /********************************************/
+        /*                 EEPROM                   */
+        /********************************************/
+
+    private:
+
+        bool_t eeprom_in_progress_flag = false;
+
+        INLINE result_t eeprom_init( void );
+        INLINE void eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type );
+
+        static void eeprom_event_cb( void * p_instance, EEPROMClass::eeprom_event_type_t event_type );
+
         /****************************************************/
         /*                     Machine                      */
         /****************************************************/
@@ -105,7 +117,10 @@ class ConfigManager
         typedef enum
         {
             CONFIG_STATE_IDLE = 1,
-            CONFIG_STATE_SAVE,
+            CONFIG_STATE_ERASE,
+            CONFIG_STATE_ERASE_WAIT,
+            CONFIG_STATE_WRITE,
+            CONFIG_STATE_WRITE_WAIT,
         } config_state_t;
 
         config_state_t machine_state = CONFIG_STATE_IDLE;
@@ -115,7 +130,10 @@ class ConfigManager
 
         INLINE void machine_state_set( config_state_t state );
         INLINE void machine_state_idle( void );
-        INLINE void machine_state_save( void );
+        INLINE void machine_state_erase( void );
+        INLINE void machine_state_erase_wait( void );
+        INLINE void machine_state_write( void );
+        INLINE void machine_state_write_wait( void );
         INLINE void machine( void );
 };
 

@@ -29,20 +29,53 @@
 #pragma once
 
 #include "dl_middleware.h"
+#include "nrf_fstorage.h"
 
 class EEPROMClass
 {
     public:
-        result_t init( void );
+        typedef enum
+        {
+            EEPROM_EVENT_TYPE_WRITE_FINISHED = 1,
+            EEPROM_EVENT_TYPE_ERASE_FINISHED,
+        } eeprom_event_type_t;
+
+        typedef void (* eeprom_event_cb)( void * p_instance, eeprom_event_type_t event_type );
+
+        typedef struct
+        {
+            /* Event callback */
+            void * p_instance;
+            eeprom_event_cb event_cb;
+        } eeprom_config_t;
+
+        result_t init( const eeprom_config_t * p_config );
         uint32_t align_get(void);
 
         result_t read( uint32_t addr_offset, uint8_t * p_data, size_t data_size );
         result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
         result_t erase(void);
 
+    public:
+        static void fstorage_evt_handler_nrf( nrf_fstorage_evt_t * p_evt );
+
     private:
-        bool_t initialized = false;
+
+        /* Addresses */
         uint32_t addr_offset_protected = 0;  /* Used to protect already written addresses to prevent multiple address writes */
+
+        /* Flags */
+        bool_t initialized_flag = false;
+        bool_t eeprom_busy_flag;
+
+        /* Event callback */
+        void * p_instance;
+        eeprom_event_cb event_cb;
+
+        inline void event_handler( eeprom_event_type_t event_type );
+
+        inline result_t fstorage_init();
+        inline void fstorage_evt_handler( nrf_fstorage_evt_t * p_evt );
 };
 
 extern EEPROMClass EEPROM;

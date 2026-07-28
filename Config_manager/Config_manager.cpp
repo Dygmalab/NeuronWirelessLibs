@@ -18,7 +18,6 @@
  */
 
 #include "Config_manager.h"
-#include "EEPROM.h"
 
 bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t item_size )
 {
@@ -80,43 +79,6 @@ void ConfigManager::config_save_request( void )
     timer_set_ms( &config_save_timer, CONFIG_SAVE_TIMEOUT_MS );
 }
 
-result_t ConfigManager::config_save( void )
-{
-    result_t result = RESULT_ERR;
-
-    result = EEPROM.erase();
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.erase failed" );
-    EXIT_IF_ERR( result, "EEPROM.erase failed" );
-
-    result = EEPROM.write( 0, p_cache, cache_size );
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.write failed" );
-    EXIT_IF_ERR( result, "EEPROM.write failed" );
-
-_EXIT:
-    return result;
-}
-
-void ConfigManager::config_save_now( void )
-{
-    /* First, let the config machine finish its last operation */
-    while( machine_state != CONFIG_STATE_IDLE )
-    {
-        run();
-    }
-
-    /* Check if the configuration has changed and thus it makes sense to perform the save */
-    if( config_save_requested == false )
-    {
-        return;
-    }
-
-    /* Clear the flag */
-    config_save_requested = false;
-
-    /* Trigger the config save in the EEPROM */
-    config_save();
-}
-
 /********************************************/
 /*           Keyboard API memory            */
 /********************************************/
@@ -167,6 +129,59 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
 
 
 /********************************************/
+/*                 EEPROM                   */
+/********************************************/
+
+INLINE void ConfigManager::eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type )
+{
+    switch( event_type )
+    {
+        case EEPROMClass::EEPROM_EVENT_TYPE_WRITE_FINISHED:
+
+            ASSERT_DYGMA( machine_state == CONFIG_STATE_WRITE_WAIT, "EEPROM write finished flag received in unexpected ConfigManager state" );
+
+            eeprom_in_progress_flag = false;
+
+            break;
+
+        case EEPROMClass::EEPROM_EVENT_TYPE_ERASE_FINISHED:
+
+            ASSERT_DYGMA( machine_state == CONFIG_STATE_ERASE_WAIT, "EEPROM erase finished flag received in unexpected ConfigManager state" );
+
+            eeprom_in_progress_flag = false;
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled EEPROM event type" );
+
+            break;
+    }
+}
+
+void ConfigManager::eeprom_event_cb( void * p_instance, EEPROMClass::eeprom_event_type_t event_type )
+{
+    ConfigManager * p_config_manager = ( ConfigManager *)p_instance;
+    p_config_manager->eeprom_event_handler( event_type );
+}
+
+INLINE result_t ConfigManager::eeprom_init( void )
+{
+    result_t result = RESULT_ERR;
+    EEPROMClass::eeprom_config_t config;
+
+    config.p_instance = this;
+    config.event_cb = eeprom_event_cb;
+
+    result = EEPROM.init( &config );
+    EXIT_IF_ERR( result, "EEPROM.init failed" );
+
+_EXIT:
+    return result;
+}
+
+/********************************************/
 /*                 Machine                  */
 /********************************************/
 
@@ -182,22 +197,74 @@ INLINE void ConfigManager::machine_state_idle( void )
     if( config_save_requested == true && timer_check( &config_save_timer ) == true )
     {
         config_save_requested = false;
-        machine_state_set( CONFIG_STATE_SAVE );
+        machine_state_set( CONFIG_STATE_ERASE );
     }
 }
 
-INLINE void ConfigManager::machine_state_save( void )
+INLINE void ConfigManager::machine_state_erase( void )
 {
     result_t result = RESULT_ERR;
 
-    /* Update the brightness and return to the IDLE state */
-    result = config_save();
+    /* Set the EEPROM in progress flag */
+    eeprom_in_progress_flag = true;
+
+    /* Initiate the EEPROM erase process */
+    result = EEPROM.erase();
+    STOP_IF_ERR( result, "EEPROM.erase failed" );
     EXIT_IF_NOK( result );
 
-    machine_state_set( CONFIG_STATE_IDLE );
+    machine_state_set( CONFIG_STATE_ERASE_WAIT );
 
 _EXIT:
+    if( result != RESULT_OK )
+    {
+        eeprom_in_progress_flag = false;
+    }
+
     return;
+}
+
+INLINE void ConfigManager::machine_state_erase_wait( void )
+{
+    if( eeprom_in_progress_flag == true )
+    {
+        return;
+    }
+
+    machine_state_set( CONFIG_STATE_WRITE );
+}
+
+INLINE void ConfigManager::machine_state_write( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Set the EEPROM in progress flag */
+    eeprom_in_progress_flag = true;
+
+    /* Initiate the EEPROM write process */
+    result = EEPROM.write( 0, p_cache, cache_size );
+    STOP_IF_ERR( result, "EEPROM.write failed" );
+    EXIT_IF_NOK( result );
+
+    machine_state_set( CONFIG_STATE_WRITE_WAIT );
+
+_EXIT:
+    if( result != RESULT_OK )
+    {
+        eeprom_in_progress_flag = false;
+    }
+
+    return;
+}
+
+INLINE void ConfigManager::machine_state_write_wait( void )
+{
+    if( eeprom_in_progress_flag == true )
+    {
+        return;
+    }
+
+    machine_state_set( CONFIG_STATE_IDLE );
 }
 
 INLINE void ConfigManager::machine( void )
@@ -210,9 +277,27 @@ INLINE void ConfigManager::machine( void )
 
             break;
 
-        case CONFIG_STATE_SAVE:
+        case CONFIG_STATE_ERASE:
 
-            machine_state_save();
+            machine_state_erase();
+
+            break;
+
+        case CONFIG_STATE_ERASE_WAIT:
+
+            machine_state_erase_wait();
+
+            break;
+
+        case CONFIG_STATE_WRITE:
+
+            machine_state_write();
+
+            break;
+
+        case CONFIG_STATE_WRITE_WAIT:
+
+            machine_state_write_wait();
 
             break;
 
@@ -248,8 +333,8 @@ result_t ConfigManager::init( const ConfigManager_config_t * p_config )
     item_request_kbdmem_cb = p_config->item_request_kbdmem_cb;
 
     /* Initialize the EEPROM */
-    result = EEPROM.init();
-    EXIT_IF_ERR( result, "EEPROM.init failed" );
+    result = eeprom_init();
+    EXIT_IF_ERR( result, "eeprom_init failed" );
 
     /* Get the config image */
     config_load();

@@ -117,16 +117,12 @@ extern "C"
 
 #define FLASH_STORAGE_ALIGN                     4       /* The FLASH data is aligned by 4 bytes */
 
-volatile static bool flag_write_completed = false;
-volatile static bool flag_erase_completed = false;
-
-static void fstorage_evt_handler(nrf_fstorage_evt_t *evt);
 static inline uint32_t flash_first_page_start_addr_get(void);
 static inline uint32_t flash_last_page_end_addr_get(void);
 
 // Creates an fstorage instance.
 NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
-    .evt_handler = fstorage_evt_handler,
+    .evt_handler = EEPROMClass::fstorage_evt_handler_nrf,
 
     /*
         You must set these manually, even at runtime, before nrf_fstorage_init() is called.
@@ -165,56 +161,73 @@ static inline uint32_t flash_last_page_end_addr_get(void)
     return flash_first_page_start_addr_get() + FLASH_STORAGE_SIZE - 1;
 }
 
-static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
+inline void EEPROMClass::event_handler( eeprom_event_type_t event_type )
 {
-    if (p_evt->result != NRF_SUCCESS)
+    if( event_cb == NULL )
     {
-        NRF_LOG_ERROR("EEPROM: Error while executing an fstorage operation.");
-        NRF_LOG_FLUSH();
+        return;
+    }
+
+    event_cb( p_instance, event_type );
+}
+
+/************************************************************/
+/*                         fstorage                         */
+/************************************************************/
+
+void EEPROMClass::fstorage_evt_handler( nrf_fstorage_evt_t * p_evt )
+{
+    if ( p_evt->result != NRF_SUCCESS )
+    {
+        NRF_LOG_ERROR( "EEPROM: Error while executing an fstorage operation." );
+        NRF_LOG_FLUSH( );
 
         return;
     }
 
-    switch (p_evt->id)
+    switch ( p_evt->id )
     {
         case NRF_FSTORAGE_EVT_WRITE_RESULT:
-        {
 #if FLASH_STORAGE_DEBUG_WRITE
-            NRF_LOG_DEBUG("EEPROM: Writing completed.");
-            NRF_LOG_FLUSH();
+            NRF_LOG_DEBUG( "EEPROM: Writing completed." );
+            NRF_LOG_FLUSH( );
 #endif
+            eeprom_busy_flag = false;
 
-            flag_write_completed = true;
-        }
-        break;
+            event_handler( EEPROM_EVENT_TYPE_WRITE_FINISHED );
+
+            break;
 
         case NRF_FSTORAGE_EVT_ERASE_RESULT:
-        {
-#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-            NRF_LOG_DEBUG("EEPROM: Erase completed.");
-            NRF_LOG_FLUSH();
-#endif
 
-            flag_erase_completed = true;
-        }
-        break;
+#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
+            NRF_LOG_DEBUG( "EEPROM: Erase completed." );
+            NRF_LOG_FLUSH( );
+#endif
+            eeprom_busy_flag = false;
+
+            event_handler( EEPROM_EVENT_TYPE_ERASE_FINISHED );
+
+            break;
 
         default:
-        {
-        }
-        break;
+
+            ASSERT_DYGMA( false, "Unhandled fstorage event detected" );
+
+            break;
     }
 }
 
-result_t EEPROMClass::init( void )
+void EEPROMClass::fstorage_evt_handler_nrf( nrf_fstorage_evt_t * p_evt )
 {
-    nrf_fstorage_api_t *fs_api;
+    EEPROMClass * p_eeprom = ( EEPROMClass *)p_evt->p_param;
+    p_eeprom->fstorage_evt_handler( p_evt );
+}
 
-    if( initialized == true )
-    {
-        /* The EEPROM is already initialized */
-        return RESULT_OK;
-    }
+result_t EEPROMClass::fstorage_init( void )
+{
+    ret_code_t rc;
+    nrf_fstorage_api_t *fs_api;
 
 #ifdef SOFTDEVICE_PRESENT
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
@@ -232,18 +245,48 @@ result_t EEPROMClass::init( void )
     fs_api = &nrf_fstorage_nvmc;
 #endif
 
-    ret_code_t rc = nrf_fstorage_init(&fstorage_instance, fs_api, NULL);
+    rc = nrf_fstorage_init( &fstorage_instance, fs_api, this );
     if( rc != NRF_SUCCESS )
     {
         return RESULT_ERR;
     }
     APP_ERROR_CHECK(rc);
 
+    return RESULT_OK;
+}
+
+/************************************************************/
+/*                           API                            */
+/************************************************************/
+
+result_t EEPROMClass::init( const eeprom_config_t * p_config )
+{
+    result_t result = RESULT_ERR;
+
+    if( initialized_flag == true )
+    {
+        /* The EEPROM is already initialized */
+        return RESULT_OK;
+    }
+
+    result = fstorage_init( );
+    EXIT_IF_ERR( result, "fstorage_init failed" );
+
     /* Initially, the whole EEPROM space is protected and forcing the erase needs to be called before any write */
     addr_offset_protected = FLASH_STORAGE_SIZE;
-    initialized = true;
 
-    return RESULT_OK;
+    /* Set the flags */
+    eeprom_busy_flag = false;
+
+    /* Event callback */
+    p_instance = p_config->p_instance;
+    event_cb = p_config->event_cb;
+
+    /* Set the initialized flag */
+    initialized_flag = true;
+
+_EXIT:
+    return result;
 }
 
 uint32_t EEPROMClass::align_get(void)
@@ -264,15 +307,11 @@ result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_
         return RESULT_ERR;
     }
 
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
-    {
-        yield();  // Meanwhile execute tasks.
-    }
-
     // At startup, EEPROMclass loads all the flash memory pages it uses.
     ret_code_t ret_code = nrf_fstorage_read( &fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, p_data, data_size );
     if ( ret_code != NRF_SUCCESS )
     {
+        ASSERT_DYGMA(false, "EEPROM read is not expected to fail");
         return RESULT_ERR;
     }
 
@@ -301,22 +340,21 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
         ASSERT_DYGMA(false, "EEPROM available space overflow");
         return RESULT_ERR;
     }
-
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
+    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( &fstorage_instance ) == true )
     {
-        yield();  // Meanwhile execute tasks.
+        return RESULT_BUSY;
     }
 
 #if FLASH_STORAGE_DEBUG_ERASE_PAGE
     NRF_LOG_DEBUG("EEPROM: Writing flash...");
     NRF_LOG_FLUSH();
 #endif
-    flag_write_completed = false;
+    eeprom_busy_flag = true;
     ret_code_t ret_code = nrf_fstorage_write(&fstorage_instance,
                                              FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset,
                                              p_data,
                                              data_size,
-                                             NULL);
+                                             this);
     if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Write error, ret_code = %d", ret_code);
@@ -334,7 +372,7 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
            internal queue of operations is full.
         */
 
-        flag_write_completed = true;
+        eeprom_busy_flag = false;
 
         return RESULT_ERR;
     }
@@ -346,10 +384,6 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
 
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
-    while (!flag_write_completed)
-    {
-        yield();  // Meanwhile execute tasks.
-    }
 
     /* Shift the protected address offset */
     addr_offset_protected = addr_offset + data_size;
@@ -359,20 +393,20 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
 
 result_t EEPROMClass::erase(void)
 {
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
+    if( eeprom_busy_flag == true || nrf_fstorage_is_busy( &fstorage_instance ) == true )
     {
-        yield();  // Meanwhile execute tasks.
+        return RESULT_BUSY;
     }
 
 #if FLASH_STORAGE_DEBUG_ERASE_PAGE
     NRF_LOG_DEBUG("EEPROM: Erasing flash...");
     NRF_LOG_FLUSH();
 #endif
-    flag_erase_completed = false;
+    eeprom_busy_flag = false;
     ret_code_t ret_code = nrf_fstorage_erase(&fstorage_instance,
                                              FLASH_STORAGE_FIRST_PAGE_START_ADDR,
                                              FLASH_STORAGE_NUM_PAGES,
-                                             NULL);
+                                             this);
     if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Erase error, ret_code = %lu", ret_code);
@@ -390,7 +424,7 @@ result_t EEPROMClass::erase(void)
            internal queue of operations is full.
         */
 
-        flag_erase_completed = true;
+        eeprom_busy_flag = true;
 
         return RESULT_ERR;
     }
@@ -402,10 +436,6 @@ result_t EEPROMClass::erase(void)
 
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
-    while (!flag_erase_completed)
-    {
-        yield();  // Meanwhile execute tasks.
-    }
 
     addr_offset_protected = 0;
 
