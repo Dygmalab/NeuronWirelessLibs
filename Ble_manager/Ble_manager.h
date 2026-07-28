@@ -140,6 +140,7 @@ class BleManager
 
 //    const char *ble_device_name = nullptr;
     uint8_t channels_paired_mask = 0;           /* The mask of the paired channels */
+    const channel_t * p_channel_current = NULL;
 //    uint8_t channel_in_use = NOT_CONNECTED;
 //    bool showing_bt_layer = false;
 //    bool mitm_activated = false;
@@ -164,9 +165,9 @@ class BleManager
     bool_t hmi_deactivate_req_flag;
     bool_t hmi_active_flag;
 
-    result_t channel_init( const channel_t * p_channel );
     result_t channels_init( void );
-    void channel_paired_set( const channel_t * p_channel, bool paired );
+    void channels_update( void );
+    void channel_paired_set( const channel_t * p_channel );
 
     result_t ble_ll_init( void );
     void ble_ll_whitelist_configure( void );
@@ -202,6 +203,13 @@ class BleManager
     inline result_t hmi_key_enabled_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_active_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_process( kbdapi_key_t * p_key );
+
+    inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
+    inline void hmi_led_effect_on( void );
+    inline void hmi_led_effect_off( void );
+    inline void hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
+    inline void hmi_led_effect_adv( void );
+    inline void hmi_led_effect_con( void );
 
     result_t kbdif_initialize(void);
     inline kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
