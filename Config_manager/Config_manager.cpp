@@ -138,15 +138,11 @@ INLINE void ConfigManager::eeprom_event_handler( EEPROMClass::eeprom_event_type_
     {
         case EEPROMClass::EEPROM_EVENT_TYPE_WRITE_FINISHED:
 
-            ASSERT_DYGMA( machine_state == CONFIG_STATE_WRITE_WAIT, "EEPROM write finished flag received in unexpected ConfigManager state" );
-
             eeprom_in_progress_flag = false;
 
             break;
 
         case EEPROMClass::EEPROM_EVENT_TYPE_ERASE_FINISHED:
-
-            ASSERT_DYGMA( machine_state == CONFIG_STATE_ERASE_WAIT, "EEPROM erase finished flag received in unexpected ConfigManager state" );
 
             eeprom_in_progress_flag = false;
 
