@@ -166,13 +166,22 @@ void BleManager::ble_ll_whitelist_configure( void )
 //    }
 }
 
-void BleManager::ble_ll_event_type_advertising_process( void )
+inline void BleManager::ble_ll_event_type_advertising_process( void )
 {
     /* Set the advertising state */
     state_set( BLEM_STATE_ADVERTISING );
 
     /* Activate the HMI advertising mode */
     hmi_led_effect_adv();
+}
+
+inline void BleManager::ble_ll_event_type_sec_code_req_process( void )
+{
+    /* Set the advertising state */
+    state_set( BLEM_STATE_PAIRING );
+
+    /* Activate the HMI advertising mode */
+    hmi_led_effect_pairing();
 }
 
 void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
@@ -182,6 +191,22 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
         case BLECDEV_EVENT_TYPE_ADVERTISING:
 
             ble_ll_event_type_advertising_process();
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_ADVERTISING_FAILED:
+
+#warning "BLECDEV_EVENT_TYPE_ADVERTISING_FAILED not handled"
+
+            /* Previously, the system went to sleep, sending the sleep message to keyscanner. What should we do now in the new system? FAILURE event? */
+
+            ASSERT_DYGMA( false, "BLECDEV_EVENT_TYPE_ADVERTISING_FAILED not handled" );
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_SEC_CODE_REQ:
+
+            ble_ll_event_type_sec_code_req_process();
 
             break;
 
@@ -586,6 +611,8 @@ inline void BleManager::state_enable_process( void )
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_adv_start_whitelist failed" );
     EXIT_IF_ERR( result, "blecdev_adv_start_whitelist failed" );
 
+
+    enabled_flag = true;
     state_set( BLEM_STATE_ENABLED );
 
 _EXIT:
@@ -595,9 +622,6 @@ _EXIT:
 inline void BleManager::state_disable_process( void )
 {
     result_t result = RESULT_ERR;
-
-    /* Enable the HMI machine */
-    hmi_disable();
 
     result = blecdev_disable();
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_disable failed" );
@@ -610,6 +634,18 @@ inline void BleManager::state_disable_process( void )
     {
         result = enable();
         ASSERT_DYGMA( result == RESULT_OK, "The BLE enable should always work at this point" );
+
+        /*
+         * IMPORTANT:
+         * Keeping the HMI enabled as well as the enabled_flag asserted to prevent flicker upon the restart
+         */
+    }
+    else
+    {
+        enabled_flag = false;
+
+        /* Disable the HMI machine */
+        hmi_disable();
     }
 
 _EXIT:
@@ -633,9 +669,21 @@ inline void BleManager::state_machine( void )
             break;
 
         case BLEM_STATE_ENABLED:
+
+            /* Waiting for blecdev / hmi events */
+
             break;
 
         case BLEM_STATE_ADVERTISING:
+
+            /* Waiting for blecdev / hmi events */
+
+            break;
+
+        case BLEM_STATE_PAIRING:
+
+            /* Waiting for blecdev / hmi events */
+
             break;
 
 //        case BLEM_STATE_CONNECTED:
@@ -746,6 +794,14 @@ _EXIT:
     return;
 }
 
+inline void BleManager::hmi_state_pairing_set( void )
+{
+    /* Exit the Bluetooth led effect */
+    hmi_led_effect_off();
+
+    hmi_state_set( BLEM_HMI_STATE_PAIRING );
+}
+
 inline void BleManager::hmi_state_enabled_process( void )
 {
     if( hmi_activate_req_flag == true )
@@ -756,6 +812,15 @@ inline void BleManager::hmi_state_enabled_process( void )
 }
 
 inline void BleManager::hmi_state_active_process( void )
+{
+    if( hmi_deactivate_req_flag == true )
+    {
+        hmi_state_enabled_set();
+        return;
+    }
+}
+
+inline void BleManager::hmi_state_pairing_process( void )
 {
     if( hmi_deactivate_req_flag == true )
     {
@@ -783,6 +848,12 @@ inline void BleManager::hmi_state_machine( void )
         case BLEM_HMI_STATE_ACTIVE:
 
             hmi_state_active_process();
+
+            break;
+
+        case BLEM_HMI_STATE_PAIRING:
+
+            hmi_state_pairing_process();
 
             break;
 
@@ -1040,6 +1111,13 @@ inline void BleManager::hmi_led_effect_adv( void )
     {
         hmi_activate();
     }
+}
+
+inline void BleManager::hmi_led_effect_pairing( void )
+{
+    ASSERT_DYGMA( hmi_is_active() == true, "BLE HMI is not expected to be inactive when entering the pairing mode" );
+
+    hmi_state_pairing_set();
 }
 
 inline void BleManager::hmi_led_effect_con( void )
@@ -1517,7 +1595,7 @@ result_t BleManager::init()
 
     /* Initialize the flags */
     enable_request_flag = false;
-//    enabled_flag = false;
+    enabled_flag = false;
     restart_flag = false;
 
     hmi_activate_req_flag = false;
@@ -1662,10 +1740,7 @@ _EXIT:
 
 bool_t BleManager::is_enabled( void )
 {
-#warning "BleManager::is_enabled not implemented"
-    return false;
-
-//    return ( enabled_flag == true ) ? true : false;
+    return enabled_flag;
 }
 
 bool_t BleManager::is_connected( void )

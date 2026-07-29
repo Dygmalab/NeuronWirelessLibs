@@ -115,6 +115,7 @@ class BleManager
         BLEM_STATE_ENABLE,
         BLEM_STATE_ENABLED,
         BLEM_STATE_ADVERTISING,
+        BLEM_STATE_PAIRING,
         BLEM_STATE_CONNECTED,
         BLEM_STATE_DISABLE,
     } blem_state_t;
@@ -124,6 +125,7 @@ class BleManager
         BLEM_HMI_STATE_DISABLED = 1,
         BLEM_HMI_STATE_ENABLED,
         BLEM_HMI_STATE_ACTIVE,
+        BLEM_HMI_STATE_PAIRING,
     } blem_hmi_state_t;
 
 //    struct ConnectionKeyState
@@ -158,7 +160,7 @@ class BleManager
 
     /* Flags */
     bool_t enable_request_flag;
-//    bool_t enabled_flag;
+    bool_t enabled_flag;
     bool_t restart_flag;
 
     bool_t hmi_activate_req_flag;
@@ -172,7 +174,8 @@ class BleManager
     result_t ble_ll_init( void );
     void ble_ll_whitelist_configure( void );
 
-    void ble_ll_event_type_advertising_process( void );
+    inline void ble_ll_event_type_advertising_process( void );
+    inline void ble_ll_event_type_sec_code_req_process( void );
     void ble_ll_event_process( blecdev_event_type_t event_type );
 
     inline void state_set( blem_state_t blem_state );
@@ -185,8 +188,10 @@ class BleManager
     inline void hmi_state_enabled_set( void );
     inline void hmi_state_disabled_set( void );
     inline void hmi_state_active_set( void );
+    inline void hmi_state_pairing_set( void );
     inline void hmi_state_enabled_process( void );
     inline void hmi_state_active_process( void );
+    inline void hmi_state_pairing_process( void );
     inline void hmi_state_machine( void );
 
     inline void hmi_enable( void );
@@ -209,6 +214,7 @@ class BleManager
     inline void hmi_led_effect_off( void );
     inline void hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
     inline void hmi_led_effect_adv( void );
+    inline void hmi_led_effect_pairing( void );
     inline void hmi_led_effect_con( void );
 
     result_t kbdif_initialize(void);
