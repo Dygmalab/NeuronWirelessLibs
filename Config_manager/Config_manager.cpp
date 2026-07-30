@@ -77,6 +77,8 @@ void ConfigManager::config_save_request( void )
 {
     config_save_requested = true;
     timer_set_ms( &config_save_timer, CONFIG_SAVE_TIMEOUT_MS );
+
+    mcu_sleep_postpone();
 }
 
 /********************************************/
@@ -134,6 +136,8 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
 
 INLINE void ConfigManager::eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type )
 {
+    mcu_sleep_postpone();
+
     switch( event_type )
     {
         case EEPROMClass::EEPROM_EVENT_TYPE_WRITE_FINISHED:
@@ -340,6 +344,18 @@ result_t ConfigManager::init( const ConfigManager_config_t * p_config )
 
 _EXIT:
     return result;
+}
+
+bool_t ConfigManager::is_busy( void )
+{
+    if( ( machine_state != CONFIG_STATE_IDLE ) || config_save_requested == true )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 void ConfigManager::run( void )

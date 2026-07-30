@@ -594,6 +594,12 @@ inline void BleManager::state_enable_process( void )
     result_t result = RESULT_ERR;
     blecdev_enable_conf_t enable_config;
 
+    /* Wait until softdevice-dependent ConfigManager processes are finished */
+    if( ConfigManager.is_busy() == true )
+    {
+        return;
+    }
+
     /* Update the channels */
     channels_update();
 
@@ -623,9 +629,15 @@ inline void BleManager::state_disable_process( void )
 {
     result_t result = RESULT_ERR;
 
+    /* Wait until softdevice-dependent ConfigManager processes are finished */
+    if( ConfigManager.is_busy() == true )
+    {
+        return;
+    }
+
     result = blecdev_disable();
-    ASSERT_DYGMA( result == RESULT_OK, "blecdev_disable failed" );
-    EXIT_IF_ERR( result, "blecdev_disable failed" );
+    ASSERT_DYGMA( result == RESULT_OK || result == RESULT_BUSY, "blecdev_disable failed" );
+    EXIT_IF_NOK( result );
 
     state_set( BLEM_STATE_DISABLED );
 

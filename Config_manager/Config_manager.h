@@ -64,6 +64,8 @@ class ConfigManager
         result_t config_item_request( cfg_item_type_t item_type, const void ** pp_item );
         result_t config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size );
 
+        bool_t is_busy( void );
+
         void run( void );
 
     private:
@@ -112,7 +114,7 @@ class ConfigManager
 
     private:
 
-    #define CONFIG_SAVE_TIMEOUT_MS    200
+    #define CONFIG_SAVE_TIMEOUT_MS    50
 
         typedef enum
         {
