@@ -69,6 +69,7 @@ class BleManager
 //
 //    void send_led_mode(void);
 
+#warning "Check the use of the BLE is_enabled function throughout the system"
     bool_t is_enabled( void );
     bool_t is_connected( void );
 
@@ -167,6 +168,9 @@ class BleManager
     bool_t hmi_deactivate_req_flag;
     bool_t hmi_active_flag;
 
+    ble_bond_code_t hmi_bond_code;
+    uint8_t hmi_bond_code_len;
+
     result_t channels_init( void );
     void channels_update( void );
     void channel_paired_set( const channel_t * p_channel );
@@ -175,8 +179,10 @@ class BleManager
     void ble_ll_whitelist_configure( void );
 
     inline void ble_ll_event_type_advertising_process( void );
-    inline void ble_ll_event_type_sec_code_req_process( void );
-    void ble_ll_event_process( blecdev_event_type_t event_type );
+    inline void ble_ll_event_type_sec_bond_code_req_process( void );
+    inline void ble_ll_event_type_sec_bond_success_process( blecdev_evt_sec_bond_success_param_t * p_sec_bond_success_param );
+    inline void ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param );
+    void ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
 
     inline void state_set( blem_state_t blem_state );
     inline void state_disabled_process( void );
@@ -205,8 +211,10 @@ class BleManager
     inline void hmi_channel_change( uint8_t channel_id );
     inline void hmi_channel_erase( uint8_t channel_id );
 
+    inline result_t hmi_key_num_to_ascii( kbdapi_key_t * p_key, char * p_ascii );
     inline result_t hmi_key_enabled_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_active_process( kbdapi_key_t * p_key );
+    inline result_t hmi_key_pairing_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_process( kbdapi_key_t * p_key );
 
     inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
@@ -263,7 +271,7 @@ class BleManager
     static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 
-    static void ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type );
+    static void ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
 };
 
 extern class BleManager BleManager;

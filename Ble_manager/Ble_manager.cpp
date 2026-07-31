@@ -175,8 +175,10 @@ inline void BleManager::ble_ll_event_type_advertising_process( void )
     hmi_led_effect_adv();
 }
 
-inline void BleManager::ble_ll_event_type_sec_code_req_process( void )
+inline void BleManager::ble_ll_event_type_sec_bond_code_req_process( void )
 {
+    ASSERT_DYGMA( p_channel_current->peer_id == PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
+
     /* Set the advertising state */
     state_set( BLEM_STATE_PAIRING );
 
@@ -184,7 +186,30 @@ inline void BleManager::ble_ll_event_type_sec_code_req_process( void )
     hmi_led_effect_pairing();
 }
 
-void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
+inline void BleManager::ble_ll_event_type_sec_bond_success_process( blecdev_evt_sec_bond_success_param_t * p_sec_bond_success_param )
+{
+    ASSERT_DYGMA( p_channel_current->peer_id == PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
+
+    /* Save the Peer ID and the  to the current channel */
+    cfgmem_channel_peer_id_save( p_channel_current, p_sec_bond_success_param->peer_id );
+    cfgmem_channel_device_address_save( p_channel_current, &p_sec_bond_success_param->peer_addr );
+
+    /* The connection is paired - deactivate */
+    hmi_deactivate();
+
+    /* Set the connected state */
+    state_set( BLEM_STATE_CONNECTED );
+}
+
+inline void BleManager::ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param )
+{
+    ASSERT_DYGMA( p_channel_current->peer_id != PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
+
+    /* Save the Peer ID to the current channel */
+    cfgmem_channel_device_name_save( p_channel_current, &p_peer_device_name_param->peer_name );
+}
+
+void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param )
 {
     switch( event_type )
     {
@@ -204,9 +229,21 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
 
             break;
 
-        case BLECDEV_EVENT_TYPE_SEC_CODE_REQ:
+        case BLECDEV_EVENT_TYPE_SEC_BOND_CODE_REQ:
 
-            ble_ll_event_type_sec_code_req_process();
+            ble_ll_event_type_sec_bond_code_req_process();
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_SEC_BOND_SUCCESS:
+
+            ble_ll_event_type_sec_bond_success_process( &p_param->sec_bond_success );
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_PEER_DEVICE_NAME:
+
+            ble_ll_event_type_peer_device_name_process( &p_param->peer_device_name );
 
             break;
 
@@ -218,10 +255,10 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type )
     }
 }
 
-void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type )
+void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type, blecdev_evt_param_t * p_param )
 {
     BleManager * p_bleManager = (BleManager *)p_instance;
-    p_bleManager->ble_ll_event_process( event_type );
+    p_bleManager->ble_ll_event_process( event_type, p_param );
 }
 
 /********************************************************************/
@@ -434,42 +471,6 @@ void BleManager::channel_paired_set( const channel_t * p_channel )
 //bool BleManager::get_pairing_key_press(void)
 //{
 //    return pairing_key_press;
-//}
-//
-//bool BleManager::is_num_key( kbdapi_key_t * p_key )
-//{
-//    /*
-//     *  KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT,
-//     *  KBDAPI_KEY_TYPE_KBD_2_AND_AT,
-//     *  KBDAPI_KEY_TYPE_KBD_3_AND_POUND,
-//     *  KBDAPI_KEY_TYPE_KBD_4_AND_DOLLAR,
-//     *  KBDAPI_KEY_TYPE_KBD_5_AND_PERCENT,
-//     *  KBDAPI_KEY_TYPE_KBD_6_AND_CARAT,
-//     *  KBDAPI_KEY_TYPE_KBD_7_AND_AMPERSAND,
-//     *  KBDAPI_KEY_TYPE_KBD_8_AND_ASTERISK,
-//     *  KBDAPI_KEY_TYPE_KBD_9_AND_LEFT_PAREN,
-//     *  KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN,
-//    */
-//    if (( p_key->type >= KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT) && (p_key->type <= KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN))
-//    {
-//        return true;
-//    }
-//
-//    return false;
-//}
-//
-//char BleManager::raw_key_to_ascii( kbdapi_key_t * p_key )
-//{
-//    uint8_t num = p_key->type - KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT + 1;
-//
-//    if (num != 10)
-//    {
-//        return (num + '0'); // To ASCII num.
-//    }
-//    else
-//    {
-//        return '0';
-//    }
 //}
 //
 //void BleManager::erase_paired_device(uint8_t index_channel)
@@ -698,8 +699,11 @@ inline void BleManager::state_machine( void )
 
             break;
 
-//        case BLEM_STATE_CONNECTED:
-//            break;
+        case BLEM_STATE_CONNECTED:
+
+            /* Waiting for blecdev / hmi events */
+
+            break;
 
         case BLEM_STATE_DISABLE:
 
@@ -811,6 +815,11 @@ inline void BleManager::hmi_state_pairing_set( void )
     /* Exit the Bluetooth led effect */
     hmi_led_effect_off();
 
+    /* Prepare the encryption pin space */
+    memset( &hmi_bond_code, 0x00, sizeof(hmi_bond_code) );
+    hmi_bond_code_len = 0;
+
+    /* Go to the HMI pairing state */
     hmi_state_set( BLEM_HMI_STATE_PAIRING );
 }
 
@@ -1005,6 +1014,37 @@ inline void BleManager::hmi_channel_erase( uint8_t channel_id )
 
 }
 
+result_t BleManager::hmi_key_num_to_ascii( kbdapi_key_t * p_key, char * p_ascii )
+{
+    uint8_t num;
+
+    /*
+     *  KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT,
+     *  KBDAPI_KEY_TYPE_KBD_2_AND_AT,
+     *  KBDAPI_KEY_TYPE_KBD_3_AND_POUND,
+     *  KBDAPI_KEY_TYPE_KBD_4_AND_DOLLAR,
+     *  KBDAPI_KEY_TYPE_KBD_5_AND_PERCENT,
+     *  KBDAPI_KEY_TYPE_KBD_6_AND_CARAT,
+     *  KBDAPI_KEY_TYPE_KBD_7_AND_AMPERSAND,
+     *  KBDAPI_KEY_TYPE_KBD_8_AND_ASTERISK,
+     *  KBDAPI_KEY_TYPE_KBD_9_AND_LEFT_PAREN,
+     *  KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN,
+    */
+    if (( p_key->type < KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT) || (p_key->type > KBDAPI_KEY_TYPE_KBD_0_AND_RIGHT_PAREN))
+    {
+        /* The key is not numeric */
+        return RESULT_ERR;
+    }
+
+    /* Get the numeric base of the number */
+    num = p_key->type - KBDAPI_KEY_TYPE_KBD_1_AND_EXCLAMATION_POINT + 1;
+
+    /* Calculate the ascii representation of the key */
+    *p_ascii = ( num != 10 ) ? ( num + '0' ) : '0';
+
+    return RESULT_OK;
+}
+
 inline result_t BleManager::hmi_key_enabled_process( kbdapi_key_t * p_key )
 {
 #warning "KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING is not processed yet"
@@ -1045,6 +1085,39 @@ _EXIT:
     return RESULT_OK; /* The key is always consumed in HMI active state */
 }
 
+inline result_t BleManager::hmi_key_pairing_process( kbdapi_key_t * p_key )
+{
+    result_t result = RESULT_ERR;
+
+    /* The key is read upon its release */
+    if( p_key->toggled_off == false )
+    {
+        return RESULT_OK; /* The key is always consumed in HMI pairing state */
+    }
+
+    /* Convert the key to numeric ASCII */
+    result = hmi_key_num_to_ascii( p_key, (char *)&hmi_bond_code.code[ hmi_bond_code_len ] );
+    EXIT_IF_NOK( result );
+
+    /* The numeric ascii conversion was successful - increase the pin length */
+    hmi_bond_code_len++;
+
+    if( hmi_bond_code_len < sizeof( hmi_bond_code ) )
+    {
+        return RESULT_OK; /* The key is always consumed in HMI pairing state */
+    }
+
+    /* The pin is complete - provide it to the ble composite device */
+    result = blecdev_sec_bond_code_send( &hmi_bond_code );
+    ASSERT_DYGMA( result == RESULT_OK, "blecdev_enc_pin_send failed" );
+
+    /* Return to the HMI active state */
+    hmi_state_active_set();
+
+_EXIT:
+    return RESULT_OK; /* The key is always consumed in HMI pairing state */
+}
+
 inline result_t BleManager::hmi_key_process( kbdapi_key_t * p_key )
 {
     result_t result = RESULT_ERR;
@@ -1066,6 +1139,12 @@ inline result_t BleManager::hmi_key_process( kbdapi_key_t * p_key )
         case BLEM_HMI_STATE_ACTIVE:
 
             result = hmi_key_active_process( p_key );
+
+            break;
+
+        case BLEM_HMI_STATE_PAIRING:
+
+            result = hmi_key_pairing_process( p_key );
 
             break;
 
@@ -1757,8 +1836,7 @@ bool_t BleManager::is_enabled( void )
 
 bool_t BleManager::is_connected( void )
 {
-#warning "BleManager::is_connected not implemented"
-    return false;
+    return ( state == BLEM_STATE_CONNECTED ) ? true : false;
 }
 
 void BleManager::battery_level_update( uint8_t battery_level )
