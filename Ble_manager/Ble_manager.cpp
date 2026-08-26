@@ -201,6 +201,17 @@ inline void BleManager::ble_ll_event_type_sec_bond_success_process( blecdev_evt_
     state_set( BLEM_STATE_CONNECTED );
 }
 
+inline void BleManager::ble_ll_event_type_peer_connected_process( blecdev_evt_peer_connected_param_t * p_peer_connected_param )
+{
+    ASSERT_DYGMA( p_peer_connected_param->peer_id == p_channel_current->peer_id, "BLE connected to an unexpected peer" );
+
+    /* The connection is paired - deactivate */
+    hmi_deactivate();
+
+    /* Set the connected state */
+    state_set( BLEM_STATE_CONNECTED );
+}
+
 inline void BleManager::ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param )
 {
     ASSERT_DYGMA( p_channel_current->peer_id != PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
@@ -238,6 +249,12 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_
         case BLECDEV_EVENT_TYPE_SEC_BOND_SUCCESS:
 
             ble_ll_event_type_sec_bond_success_process( &p_param->sec_bond_success );
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_PEER_CONNECTED:
+
+            ble_ll_event_type_peer_connected_process( &p_param->peer_connected );
 
             break;
 
