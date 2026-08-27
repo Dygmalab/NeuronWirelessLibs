@@ -1082,9 +1082,16 @@ result_t BleManager::hmi_key_num_to_ascii( kbdapi_key_t * p_key, char * p_ascii 
 
 inline result_t BleManager::hmi_key_enabled_process( kbdapi_key_t * p_key )
 {
-#warning "KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING is not processed yet"
+    /* Accepting the Bluetooth pairing key when it is toggled on. */
+    if ( p_key->type != KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING || p_key->toggled_on == false )
+    {
+        return RESULT_ERR;  /* The key is ignored */
+    }
 
-    return RESULT_ERR;  /* The key is ignored */
+    /* Enter the HMI Active state */
+    hmi_activate();
+
+    return RESULT_OK; /* The key is consumed */
 }
 
 inline result_t BleManager::hmi_key_active_process( kbdapi_key_t * p_key )
@@ -1117,6 +1124,17 @@ inline result_t BleManager::hmi_key_active_process( kbdapi_key_t * p_key )
     }
 
 _EXIT:
+    /* In case a Channel ID has not been resolved */
+    if ( result == RESULT_ERR )
+    {
+        /* Check the Bluetooth Pairing key has been press in the HMI active state */
+        if( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on == true )
+        {
+            /* Exit the HMI Active state */
+            hmi_deactivate();
+        }
+    }
+
     return RESULT_OK; /* The key is always consumed in HMI active state */
 }
 
