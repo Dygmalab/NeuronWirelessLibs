@@ -627,13 +627,9 @@ inline void BleManager::state_enable_process( void )
     /* Enable the ble composite device */
     enable_config.current_channel_id = p_channel_current->id;
 
-#warning Now that bonding is successful with the bond code, we should provide the blecdev with the chosen peer to connect to
-
     result = blecdev_enable( &enable_config );
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_enable failed" );
     EXIT_IF_ERR( result, "blecdev_enable failed" );
-
-#warning Now that bonding is successful with the bond code, we should continue here with the bonded device search
 
     /* Check if the current channel peer ID is not bonded. */
     if( p_channel_current->peer_id == PM_PEER_ID_INVALID )
@@ -645,9 +641,7 @@ inline void BleManager::state_enable_process( void )
     }
     else
     {
-        /* The peer is bonded on this channel, hence we start advertising over whitelisted connections. */
-
-#warning "This will whitelist all bonded devices. We might need to filter just one device with this ID"
+        /* The peer is bonded on this channel, hence we start connection to the peer. */
         result = blecdev_peer_conn_start( p_channel_current->peer_id );
         ASSERT_DYGMA( result == RESULT_OK, "blecdev_adv_start_whitelist failed" );
         EXIT_IF_ERR( result, "blecdev_adv_start_whitelist failed" );
