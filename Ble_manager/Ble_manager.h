@@ -181,6 +181,7 @@ class BleManager
     inline void ble_ll_event_type_advertising_process( void );
     inline void ble_ll_event_type_sec_bond_code_req_process( void );
     inline void ble_ll_event_type_sec_bond_success_process( blecdev_evt_sec_bond_success_param_t * p_sec_bond_success_param );
+    inline void ble_ll_event_type_sec_bond_failed_process( blecdev_evt_sec_bond_failed_param_t * p_sec_bond_failed_param );
     inline void ble_ll_event_type_peer_connected_process( blecdev_evt_peer_connected_param_t * p_peer_connected_param );
     inline void ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param );
     void ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );

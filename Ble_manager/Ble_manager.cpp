@@ -201,6 +201,19 @@ inline void BleManager::ble_ll_event_type_sec_bond_success_process( blecdev_evt_
     state_set( BLEM_STATE_CONNECTED );
 }
 
+inline void BleManager::ble_ll_event_type_sec_bond_failed_process( blecdev_evt_sec_bond_failed_param_t * p_sec_bond_failed_param )
+{
+    result_t result = RESULT_ERR;
+
+    ASSERT_DYGMA( p_sec_bond_failed_param->peer_id == p_channel_current->peer_id, "BLE security failed to an unexpected peer" );
+
+    /* Reset the BLE connection process */
+    result = restart( );
+    ASSERT_DYGMA( result == RESULT_OK, "BLE restart failed" );
+
+    UNUSED( result );
+}
+
 inline void BleManager::ble_ll_event_type_peer_connected_process( blecdev_evt_peer_connected_param_t * p_peer_connected_param )
 {
     ASSERT_DYGMA( p_peer_connected_param->peer_id == p_channel_current->peer_id, "BLE connected to an unexpected peer" );
@@ -249,6 +262,12 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_
         case BLECDEV_EVENT_TYPE_SEC_BOND_SUCCESS:
 
             ble_ll_event_type_sec_bond_success_process( &p_param->sec_bond_success );
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_SEC_BOND_FAILED:
+
+            ble_ll_event_type_sec_bond_failed_process( &p_param->sec_bond_failed );
 
             break;
 
