@@ -127,6 +127,8 @@ class BleManager
         BLEM_HMI_STATE_ENABLED,
         BLEM_HMI_STATE_ACTIVE,
         BLEM_HMI_STATE_PAIRING,
+        BLEM_HMI_STATE_CHANNEL_ERASE_KEY_WAIT,
+        BLEM_HMI_STATE_CHANNEL_ERASE,
     } blem_hmi_state_t;
 
 //    struct ConnectionKeyState
@@ -144,6 +146,7 @@ class BleManager
 //    const char *ble_device_name = nullptr;
     uint8_t channels_paired_mask = 0;           /* The mask of the paired channels */
     const channel_t * p_channel_current = NULL;
+    const channel_t * p_channel_erase = NULL;   /* The channel chosen for erase */
 //    uint8_t channel_in_use = NOT_CONNECTED;
 //    bool showing_bt_layer = false;
 //    bool mitm_activated = false;
@@ -171,6 +174,8 @@ class BleManager
     ble_bond_code_t hmi_bond_code;
     uint8_t hmi_bond_code_len;
 
+    dl_timer_t hmi_timer;
+
     result_t channels_init( void );
     void channels_update( void );
     void channel_paired_set( const channel_t * p_channel );
@@ -197,9 +202,11 @@ class BleManager
     inline void hmi_state_disabled_set( void );
     inline void hmi_state_active_set( void );
     inline void hmi_state_pairing_set( void );
+    inline void hmi_state_channel_erase_key_wait_set( void );
     inline void hmi_state_enabled_process( void );
     inline void hmi_state_active_process( void );
     inline void hmi_state_pairing_process( void );
+    inline void hmi_state_channel_erase_key_wait_process( void );
     inline void hmi_state_machine( void );
 
     inline void hmi_enable( void );
@@ -215,8 +222,11 @@ class BleManager
 
     inline result_t hmi_key_num_to_ascii( kbdapi_key_t * p_key, char * p_ascii );
     inline result_t hmi_key_enabled_process( kbdapi_key_t * p_key );
+    inline void hmi_key_active_channel_change_process( kbdapi_key_t * p_key, uint8_t channel_id );
+    inline void hmi_key_active_channel_erase_process( kbdapi_key_t * p_key, uint8_t channel_id );
     inline result_t hmi_key_active_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_pairing_process( kbdapi_key_t * p_key );
+    inline result_t hmi_key_channel_erase_key_wait_process( kbdapi_key_t * p_key );
     inline result_t hmi_key_process( kbdapi_key_t * p_key );
 
     inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );

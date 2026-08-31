@@ -31,9 +31,9 @@
 #include "nrf_log_ctrl.h"
 
 //void device_name_evt_handler(void);
-//
-//#define KEY_ERASE_HOLD_TIMEOUT_MS   3000
-//
+
+#define HMI_CHANNEL_ERASE_KEY_HOLD_TIMEOUT_MS       3000    /* 3 seconds */
+
 //Do_once clear_pin_digits_count;
 //
 
@@ -849,6 +849,9 @@ inline void BleManager::hmi_state_active_set( void )
     /* Start the Bluetooth led effect */
     hmi_led_effect_on();
 
+    /* Clear the possibly chosen erase channel */
+    p_channel_erase = NULL;
+
     /* Go to the Active state */
     hmi_activate_req_flag = false;
     hmi_active_flag = true;
@@ -869,6 +872,12 @@ inline void BleManager::hmi_state_pairing_set( void )
 
     /* Go to the HMI pairing state */
     hmi_state_set( BLEM_HMI_STATE_PAIRING );
+}
+
+inline void BleManager::hmi_state_channel_erase_key_wait_set( void )
+{
+    timer_set_ms( &hmi_timer, HMI_CHANNEL_ERASE_KEY_HOLD_TIMEOUT_MS );
+    hmi_state_set( BLEM_HMI_STATE_CHANNEL_ERASE_KEY_WAIT );
 }
 
 inline void BleManager::hmi_state_enabled_process( void )
@@ -898,6 +907,19 @@ inline void BleManager::hmi_state_pairing_process( void )
     }
 }
 
+inline void BleManager::hmi_state_channel_erase_key_wait_process( void )
+{
+#warning "The channel erase key wait process not implemented yet"
+
+    /* Check the channel erase key press timeout has expired */
+    if( timer_check( &hmi_timer ) == false )
+    {
+        return;
+    }
+
+
+}
+
 inline void BleManager::hmi_state_machine( void )
 {
     switch( hmi_state )
@@ -923,6 +945,12 @@ inline void BleManager::hmi_state_machine( void )
         case BLEM_HMI_STATE_PAIRING:
 
             hmi_state_pairing_process();
+
+            break;
+
+        case BLEM_HMI_STATE_CHANNEL_ERASE_KEY_WAIT:
+
+            hmi_state_channel_erase_key_wait_process();
 
             break;
 
@@ -1107,6 +1135,32 @@ inline result_t BleManager::hmi_key_enabled_process( kbdapi_key_t * p_key )
     return RESULT_OK; /* The key is consumed */
 }
 
+inline void BleManager::hmi_key_active_channel_change_process( kbdapi_key_t * p_key, uint8_t channel_id )
+{
+    /* Changing the channel upon the key toggled off */
+    if( p_key->toggled_off == false )
+    {
+        return;
+    }
+
+    /* Triggering the channel change upon the key release */
+    hmi_channel_change( channel_id );
+}
+
+inline void BleManager::hmi_key_active_channel_erase_process( kbdapi_key_t * p_key, uint8_t channel_id )
+{
+    const channel_t * p_channel = &p_config->channels[ channel_id ];
+
+    /* Starting the channel erase process upon the key toggle on. Also ignore free channels. */
+    if( p_key->toggled_on == false || p_channel->peer_id == PM_PEER_ID_INVALID )
+    {
+        return;
+    }
+
+    p_channel_erase = &p_config->channels[ channel_id ];
+    hmi_state_channel_erase_key_wait_set();
+}
+
 inline result_t BleManager::hmi_key_active_process( kbdapi_key_t * p_key )
 {
     result_t result = RESULT_ERR;
@@ -1119,17 +1173,17 @@ inline result_t BleManager::hmi_key_active_process( kbdapi_key_t * p_key )
     switch( p_key->coord.row )
     {
         case 0:
+
             /* Row 0: key 1, key 2, key 3, key 4, key 5, key 6, key 7, key 8, key 9, key 0 */
-            if( p_key->toggled_off == true )
-            {
-                /* Triggering the channel change upon the key release */
-                hmi_channel_change( channel_id );
-            }
+            hmi_key_active_channel_change_process( p_key, channel_id );
+
             break;
 
         case 1:
+
             /* Row 1: key Q, key W, key E, key R, key T, key Y, key U, key I, key O, key PT */
-            hmi_channel_erase( channel_id );
+            hmi_key_active_channel_erase_process( p_key, channel_id );
+
             break;
 
         default:
@@ -1184,6 +1238,32 @@ _EXIT:
     return RESULT_OK; /* The key is always consumed in HMI pairing state */
 }
 
+inline result_t BleManager::hmi_key_channel_erase_key_wait_process( kbdapi_key_t * p_key )
+{
+    result_t result = RESULT_ERR;
+    uint8_t channel_id;
+
+    /* Resolve the channel id to be used */
+    result = hmi_channel_resolve( &channel_id, p_key );
+    EXIT_IF_NOK( result );
+
+    /* Check the key is the channel erase key in process */
+    if( channel_id == p_channel_erase->id && p_key->coord.row != 1 )
+    {
+        return RESULT_OK; /* The key is always consumed in HMI channel erase wait state */
+    }
+
+    /* Check if the key has been released */
+    if( p_key->toggled_off == true )
+    {
+        /* Return to the HMI active state */
+        hmi_state_active_set();
+    }
+
+_EXIT:
+    return RESULT_OK; /* The key is always consumed in HMI channel erase wait state */
+}
+
 inline result_t BleManager::hmi_key_process( kbdapi_key_t * p_key )
 {
     result_t result = RESULT_ERR;
@@ -1211,6 +1291,12 @@ inline result_t BleManager::hmi_key_process( kbdapi_key_t * p_key )
         case BLEM_HMI_STATE_PAIRING:
 
             result = hmi_key_pairing_process( p_key );
+
+            break;
+
+        case BLEM_HMI_STATE_CHANNEL_ERASE_KEY_WAIT:
+
+            result = hmi_key_channel_erase_key_wait_process( p_key );
 
             break;
 
