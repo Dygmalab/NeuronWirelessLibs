@@ -21,9 +21,9 @@
 #include "dl_middleware.h"
 
 #include "Ble_composite_dev.h"
+#include "Ble_hmi.h"
 #include "ble_types.h"
 #include "kbd_if.h"
-#include "keyboard_api.h"
 #include "Time_counter.h"
 
 #define BLE_CHANNELS_COUNT      5
@@ -84,16 +84,16 @@ class BleManager
 
 //    bool pairing_key_press = false;
 //
-    enum Channels: uint8_t
-    {
-        CHANNEL_0 = 0,
-        CHANNEL_1,
-        CHANNEL_2,
-        CHANNEL_3,
-        CHANNEL_4,
-        NOT_CONNECTED,
-        NOT_ON_ADVERTISING
-    };
+//    enum Channels: uint8_t
+//    {
+//        CHANNEL_0 = 0,
+//        CHANNEL_1,
+//        CHANNEL_2,
+//        CHANNEL_3,
+//        CHANNEL_4,
+//        NOT_CONNECTED,
+//        NOT_ON_ADVERTISING
+//    };
 
 //    // THIS ENUM IS NOT BEING USED
 ////    enum Pressed_keys: uint8_t
@@ -121,15 +121,6 @@ class BleManager
         BLEM_STATE_DISABLE,
     } blem_state_t;
 
-    typedef enum
-    {
-        BLEM_HMI_STATE_DISABLED = 1,
-        BLEM_HMI_STATE_ENABLED,
-        BLEM_HMI_STATE_ACTIVE,
-        BLEM_HMI_STATE_PAIRING,
-        BLEM_HMI_STATE_CHANNEL_ERASE_KEY_WAIT,
-        BLEM_HMI_STATE_CHANNEL_ERASE,
-    } blem_hmi_state_t;
 
 //    struct ConnectionKeyState
 //    {
@@ -141,7 +132,6 @@ class BleManager
     const config_t * p_config = nullptr;
 
     blem_state_t state;
-    blem_hmi_state_t hmi_state;
 
 //    const char *ble_device_name = nullptr;
     uint8_t channels_paired_mask = 0;           /* The mask of the paired channels */
@@ -160,21 +150,11 @@ class BleManager
 //    dl_timer_t timer_save_new_name = 0;
 
     kbdif_t * p_kbdif = NULL;
-    kbdapi_key_report_lock_t kbdapi_key_report_lock;
 
     /* Flags */
     bool_t enable_request_flag;
     bool_t enabled_flag;
     bool_t restart_flag;
-
-    bool_t hmi_activate_req_flag;
-    bool_t hmi_deactivate_req_flag;
-    bool_t hmi_active_flag;
-
-    ble_bond_code_t hmi_bond_code;
-    uint8_t hmi_bond_code_len;
-
-    dl_timer_t hmi_timer;
 
     result_t channels_init( void );
     void channels_update( void );
@@ -197,48 +177,14 @@ class BleManager
     inline void state_disable_process( void );
     inline void state_machine( void );
 
-    inline void hmi_state_set( blem_hmi_state_t blem_hmi_state );
-    inline void hmi_state_enabled_set( void );
-    inline void hmi_state_disabled_set( void );
-    inline void hmi_state_active_set( void );
-    inline void hmi_state_pairing_set( void );
-    inline void hmi_state_channel_erase_key_wait_set( void );
-    inline void hmi_state_enabled_process( void );
-    inline void hmi_state_active_process( void );
-    inline void hmi_state_pairing_process( void );
-    inline void hmi_state_channel_erase_key_wait_process( void );
-    inline void hmi_state_machine( void );
-
-    inline void hmi_enable( void );
-    inline void hmi_disable( void );
-    inline void hmi_activate( void );
-    inline void hmi_deactivate( void );
-    inline bool hmi_is_enabled( void );
-    inline bool hmi_is_active( void );
-
-    inline result_t hmi_channel_resolve( uint8_t * p_channel_id, kbdapi_key_t * p_key );
-    inline void hmi_channel_change( uint8_t channel_id );
-    inline void hmi_channel_erase( uint8_t channel_id );
-
-    inline result_t hmi_key_num_to_ascii( kbdapi_key_t * p_key, char * p_ascii );
-    inline result_t hmi_key_enabled_process( kbdapi_key_t * p_key );
-    inline void hmi_key_active_channel_change_process( kbdapi_key_t * p_key, uint8_t channel_id );
-    inline void hmi_key_active_channel_erase_process( kbdapi_key_t * p_key, uint8_t channel_id );
-    inline result_t hmi_key_active_process( kbdapi_key_t * p_key );
-    inline result_t hmi_key_pairing_process( kbdapi_key_t * p_key );
-    inline result_t hmi_key_channel_erase_key_wait_process( kbdapi_key_t * p_key );
-    inline result_t hmi_key_process( kbdapi_key_t * p_key );
-
-    inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
-    inline void hmi_led_effect_on( void );
-    inline void hmi_led_effect_off( void );
-    inline void hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
-    inline void hmi_led_effect_adv( void );
-    inline void hmi_led_effect_pairing( void );
-    inline void hmi_led_effect_con( void );
+    inline result_t blehmi_init( void );
+    inline void blehmi_event_type_channel_change_process( BleHmi::blehmi_evt_channel_change_param_t * p_channel_change_param );
+    inline void blehmi_event_type_channel_erase_process( BleHmi::blehmi_evt_channel_erase_param_t * p_channel_erase_param );
+    inline void blehmi_event_type_bond_code_ready_process( BleHmi::blehmi_evt_bond_code_ready_param_t * p_bond_code_ready_param );
+    inline void blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 
     result_t kbdif_initialize(void);
-    inline kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
+//    inline kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );
 
 //    void timer_save_conn_run(uint32_t timeout_ms);
 //    void save_connection(void);
@@ -280,10 +226,11 @@ class BleManager
   private:
     static const kbdif_handlers_t kbdif_handlers;
 
-    static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
+//    static kbdapi_event_result_t kbdif_key_event_cb( void * p_instance, kbdapi_key_t * p_key );
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 
     static void ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
+    static void blehmi_event_cb( void * p_instance, BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 };
 
 extern class BleManager BleManager;
