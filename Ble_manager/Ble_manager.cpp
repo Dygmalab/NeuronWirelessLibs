@@ -15,6 +15,7 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Ble_config.h"
 #include "Ble_composite_dev.h"
 #include "Ble_hmi.h"
 #include "Ble_manager.h"
@@ -233,6 +234,16 @@ inline void BleManager::ble_ll_event_type_peer_device_name_process( blecdev_evt_
 
 void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param )
 {
+    result_t result = RESULT_ERR;
+
+    /* Check the submodule-related events */
+    result = BleConfig.cfg_blecdev_event_inject( event_type, p_param );
+    if( result != RESULT_INCOMPLETE )
+    {
+        /* The event has been consumed */
+        return;
+    }
+
     switch( event_type )
     {
         case BLECDEV_EVENT_TYPE_ADVERTISING:
@@ -637,6 +648,9 @@ inline void BleManager::state_enable_process( void )
 
     /* Update the channels */
     channels_update();
+
+    /* Enable the HMI machine */
+    BleConfig.cfg_enable();
 
     /* Enable the HMI machine */
     BleHmi.hmi_enable();
@@ -1327,6 +1341,10 @@ result_t BleManager::init()
 
 //    update_channel_and_name();
 
+    /* Initialize the BLE HMI config */
+    result = BleConfig.cfg_init();
+    EXIT_IF_ERR( result, "BleCfg.cfg_init failed" );
+
     /* Initialize the BLE HMI interface */
     result = blehmi_init();
     EXIT_IF_ERR( result, "blehmi_init failed" );
@@ -1506,6 +1524,8 @@ void BleManager::run()
     blecdev_run();
 
     state_machine();
+
+    BleConfig.cfg_run();
     BleHmi.hmi_run();
 }
 
