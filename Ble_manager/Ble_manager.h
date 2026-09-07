@@ -20,6 +20,7 @@
 
 #include "dl_middleware.h"
 
+#include "Ble_config.h"
 #include "Ble_composite_dev.h"
 #include "Ble_hmi.h"
 #include "ble_types.h"
@@ -36,21 +37,21 @@ class BleManager
 //    typedef char ble_name_t[BLE_DEVICE_NAME_LEN];
 //    typedef uint8_t ble_address_t[BLE_ADDRESS_LEN];
 
-    typedef struct PACK
-    {
-        uint8_t id;                     /* The ID of the channel in the list of the channels */
-        pm_peer_id_t peer_id;
-        ble_device_addr_t device_addr;
-        ble_device_name_t device_name;  /* The name of the remote device connected via the channel */
-    } channel_t;
-
-    typedef struct PACK
-    {
-        channel_t channels[BLE_CHANNELS_COUNT];
-        ble_device_name_t device_name_local;    /* The local BLE device name */
-        uint8_t current_channel_id;             /* The ID of the currently selected channel */
-        bool_t force_ble;
-    } config_t;
+//    typedef struct PACK
+//    {
+//        uint8_t id;                     /* The ID of the channel in the list of the channels */
+//        pm_peer_id_t peer_id;
+//        ble_device_addr_t device_addr;
+//        ble_device_name_t device_name;  /* The name of the remote device connected via the channel */
+//    } channel_t;
+//
+//    typedef struct PACK
+//    {
+//        channel_t channels[BLE_CHANNELS_COUNT];
+//        ble_device_name_t device_name_local;    /* The local BLE device name */
+//        uint8_t current_channel_id;             /* The ID of the currently selected channel */
+//        bool_t force_ble;
+//    } config_t;
 
   public:
 //    bool trigger_save_name_timer = false;
@@ -129,14 +130,14 @@ class BleManager
 //    };
 //    ConnectionKeyState connectionState[BLE_CONNECTIONS_COUNT];
 
-    const config_t * p_config = nullptr;
+//    const config_t * p_config = nullptr;
 
     blem_state_t state;
 
 //    const char *ble_device_name = nullptr;
-    uint8_t channels_paired_mask = 0;           /* The mask of the paired channels */
-    const channel_t * p_channel_current = NULL;
-    const channel_t * p_channel_erase = NULL;   /* The channel chosen for erase */
+//    uint8_t channels_paired_mask = 0;           /* The mask of the paired channels */
+    const BleConfig::blecfg_channel_t * p_channel_current = NULL;
+//    const channel_t * p_channel_erase = NULL;   /* The channel chosen for erase */
 //    uint8_t channel_in_use = NOT_CONNECTED;
 //    bool showing_bt_layer = false;
 //    bool mitm_activated = false;
@@ -156,9 +157,9 @@ class BleManager
     bool_t enabled_flag;
     bool_t restart_flag;
 
-    result_t channels_init( void );
-    void channels_update( void );
-    void channel_paired_set( const channel_t * p_channel );
+//    result_t channels_init( void );
+//    void channels_update( void );
+//    void channel_paired_set( const channel_t * p_channel );
 
     result_t ble_ll_init( void );
     void ble_ll_whitelist_configure( void );
@@ -176,6 +177,13 @@ class BleManager
     inline void state_enable_process( void );
     inline void state_disable_process( void );
     inline void state_machine( void );
+
+    inline result_t blecfg_init( void );
+    inline void blecfg_event_type_channel_bond_save_success_process( void );
+    inline void blecfg_event_type_channel_bond_save_failed_process( void );
+    inline void blecfg_event_type_channel_erase_success_process( void );
+    inline void blecfg_event_type_channel_erase_failed_process( void );
+    inline void blecfg_event_process( BleConfig::blecfg_event_type_t event_type );
 
     inline result_t blehmi_init( void );
     inline void blehmi_event_type_channel_change_process( BleHmi::blehmi_evt_channel_change_param_t * p_channel_change_param );
@@ -209,19 +217,19 @@ class BleManager
 //     */
 //    void exit_pairing_mode(void);
 
-    void cfgmem_ble_name_save( const ble_device_name_t * p_name_config, const ble_device_name_t * p_device_name );
-
-    void cfgmem_channel_id_save( const channel_t * p_channel, uint8_t id );
-    void cfgmem_channel_peer_id_save( const channel_t * p_channel, pm_peer_id_t peer_id );
-    void cfgmem_channel_device_address_save( const channel_t * p_channel, const ble_device_addr_t * p_device_addr );
-    void cfgmem_channel_device_name_save( const channel_t * p_channel, const ble_device_name_t * p_device_name );
-
-    void cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local );
-    void cfgmem_current_channel_id_save( uint8_t channel_id );
-    void cfgmem_force_ble_save( bool_t force_ble );
-
-    void cfgmem_channel_reset( const channel_t * p_channel, uint8_t id );
-    void cfgmem_config_reset();
+//    void cfgmem_ble_name_save( const ble_device_name_t * p_name_config, const ble_device_name_t * p_device_name );
+//
+//    void cfgmem_channel_id_save( const channel_t * p_channel, uint8_t id );
+//    void cfgmem_channel_peer_id_save( const channel_t * p_channel, pm_peer_id_t peer_id );
+//    void cfgmem_channel_device_address_save( const channel_t * p_channel, const ble_device_addr_t * p_device_addr );
+//    void cfgmem_channel_device_name_save( const channel_t * p_channel, const ble_device_name_t * p_device_name );
+//
+//    void cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local );
+//    void cfgmem_current_channel_id_save( uint8_t channel_id );
+//    void cfgmem_force_ble_save( bool_t force_ble );
+//
+//    void cfgmem_channel_reset( const channel_t * p_channel, uint8_t id );
+//    void cfgmem_config_reset();
 
   private:
     static const kbdif_handlers_t kbdif_handlers;
@@ -230,6 +238,7 @@ class BleManager
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 
     static void ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
+    static void blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type );
     static void blehmi_event_cb( void * p_instance, BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 };
 

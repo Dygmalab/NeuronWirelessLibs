@@ -19,7 +19,7 @@
 #include "Ble_composite_dev.h"
 #include "Ble_hmi.h"
 #include "Ble_manager.h"
-#include "Config_manager.h"
+//#include "Config_manager.h"
 //#include "kaleidoscope/Runtime.h"
 //#include "keyboard_api.h"
 #include "FirmwareVersion.h"
@@ -36,7 +36,7 @@
 //Do_once clear_pin_digits_count;
 //
 
-static const ble_device_name_t ble_device_name_local = { BLE_DEVICE_NAME };
+//static const ble_device_name_t ble_device_name_local = { BLE_DEVICE_NAME };
 
 #define BLE_MANAGER_DEBUG_LOG   1
 #if BLE_MANAGER_DEBUG_LOG
@@ -132,7 +132,7 @@ result_t BleManager::ble_ll_init( void )
     result_t result = RESULT_ERR;
     blecdev_conf_t config;
 
-    config.device_name_local = ble_device_name_local;
+    config.device_name_local = *BleConfig.cfg_ble_device_name_local_get();
     config.p_instance = this;
     config.event_cb = ble_ll_event_cb;
 
@@ -167,11 +167,13 @@ void BleManager::ble_ll_whitelist_configure( void )
 
 inline void BleManager::ble_ll_event_type_advertising_process( void )
 {
+    uint8_t channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
+
     /* Set the advertising state */
     state_set( BLEM_STATE_ADVERTISING );
 
     /* Activate the HMI advertising mode */
-    BleHmi.hmi_advertise( p_channel_current->id, channels_paired_mask );
+    BleHmi.hmi_advertise( p_channel_current->channel_id, channels_bond_mask );
 }
 
 inline void BleManager::ble_ll_event_type_sec_bond_code_req_process( void )
@@ -187,17 +189,35 @@ inline void BleManager::ble_ll_event_type_sec_bond_code_req_process( void )
 
 inline void BleManager::ble_ll_event_type_sec_bond_success_process( blecdev_evt_sec_bond_success_param_t * p_sec_bond_success_param )
 {
+    result_t result = RESULT_ERR;
+    BleConfig::blecfg_channel_t blecfg_channel;
+
     ASSERT_DYGMA( p_channel_current->peer_id == PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
 
-    /* Save the Peer ID and the  to the current channel */
-    cfgmem_channel_peer_id_save( p_channel_current, p_sec_bond_success_param->peer_id );
-    cfgmem_channel_device_address_save( p_channel_current, &p_sec_bond_success_param->peer_addr );
+    /* Prepare the Channel bonding data */
+    blecfg_channel = *p_channel_current;
 
-    /* The connection is paired - deactivate */
-    BleHmi.hmi_deactivate();
+    blecfg_channel.peer_id = p_sec_bond_success_param->peer_id;
+    blecfg_channel.device_addr = p_sec_bond_success_param->peer_addr;
 
-    /* Set the connected state */
-    state_set( BLEM_STATE_CONNECTED );
+    /* Request to make the Config Channel Bond */
+    result = BleConfig.cfg_channel_bond_save( &blecfg_channel );
+
+    if( result != RESULT_OK )
+    {
+        ASSERT_DYGMA( false, "BleConfig.cfg_channel_bond_req failed" );
+
+        /*
+         * The code currently does not handle the result ERR or BUSY. Hence, in such a case, we restart the bluetooth connection process
+         */
+
+        result = restart( );
+        ASSERT_DYGMA( result == RESULT_OK, "BLE restart failed" );
+    }
+
+    /*
+     * Now we wait until the BLE Confing event is received
+     */
 }
 
 inline void BleManager::ble_ll_event_type_sec_bond_failed_process( blecdev_evt_sec_bond_failed_param_t * p_sec_bond_failed_param )
@@ -228,8 +248,12 @@ inline void BleManager::ble_ll_event_type_peer_device_name_process( blecdev_evt_
 {
     ASSERT_DYGMA( p_channel_current->peer_id != PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
 
-    /* Save the Peer ID to the current channel */
-    cfgmem_channel_device_name_save( p_channel_current, &p_peer_device_name_param->peer_name );
+    /*
+     * We currently do not process this event
+     */
+
+//    /* Save the Peer ID to the current channel */
+//    cfgmem_channel_device_name_save( p_channel_current, &p_peer_device_name_param->peer_name );
 }
 
 void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param )
@@ -310,47 +334,47 @@ void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_
 /*                             Channels                             */
 /********************************************************************/
 
-result_t BleManager::channels_init( void )
-{
-    channels_update( );
-
-    return RESULT_OK;
-}
-
-void BleManager::channels_update( void )
-{
-    uint8_t i;
-
-    for ( i = 0; i < BLE_CHANNELS_COUNT; i++ )
-    {
-        channel_paired_set( &p_config->channels[i] );
-    }
-
-    BLE_LOG_DEBUG("Ble_manager: %i channels in total.", i);
-
-    /* Set the current channel for the later use */
-    p_channel_current = &p_config->channels[ p_config->current_channel_id ];
-}
-
-void BleManager::channel_paired_set( const channel_t * p_channel )
-{
-    bool_t channel_paired;
-    uint8_t channel_mask = ( 1 << p_channel->id );
-
-    /* Get the channel paired status */
-    channel_paired = ( p_channel->peer_id == PM_PEER_ID_INVALID ) ? false : true;
-
-    if ( channel_paired == true )
-    {
-        channels_paired_mask |= channel_mask;
-    }
-    else
-    {
-        channels_paired_mask &= ~channel_mask;
-    }
-
-    BLE_LOG_DEBUG("Ble_manager: Channel %i -> %d", p_channel->id, channel_paired );
-}
+//result_t BleManager::channels_init( void )
+//{
+//    channels_update( );
+//
+//    return RESULT_OK;
+//}
+//
+//void BleManager::channels_update( void )
+//{
+//    uint8_t i;
+//
+//    for ( i = 0; i < BLE_CHANNELS_COUNT; i++ )
+//    {
+//        channel_paired_set( &p_config->channels[i] );
+//    }
+//
+//    BLE_LOG_DEBUG("Ble_manager: %i channels in total.", i);
+//
+//    /* Set the current channel for the later use */
+//    p_channel_current = &p_config->channels[ p_config->current_channel_id ];
+//}
+//
+//void BleManager::channel_paired_set( const channel_t * p_channel )
+//{
+//    bool_t channel_paired;
+//    uint8_t channel_mask = ( 1 << p_channel->id );
+//
+//    /* Get the channel paired status */
+//    channel_paired = ( p_channel->peer_id == PM_PEER_ID_INVALID ) ? false : true;
+//
+//    if ( channel_paired == true )
+//    {
+//        channels_paired_mask |= channel_mask;
+//    }
+//    else
+//    {
+//        channels_paired_mask &= ~channel_mask;
+//    }
+//
+//    BLE_LOG_DEBUG("Ble_manager: Channel %i -> %d", p_channel->id, channel_paired );
+//}
 
 //void BleManager::update_channel_and_name(void)
 //{
@@ -646,17 +670,20 @@ inline void BleManager::state_enable_process( void )
         return;
     }
 
-    /* Update the channels */
-    channels_update();
+//    /* Update the channels */
+//    channels_update();
 
     /* Enable the HMI machine */
     BleConfig.cfg_enable();
+
+    /* Get the current channel in use */
+    p_channel_current = BleConfig.cfg_current_channel_get();
 
     /* Enable the HMI machine */
     BleHmi.hmi_enable();
 
     /* Enable the ble composite device */
-    enable_config.current_channel_id = p_channel_current->id;
+    enable_config.current_channel_id = p_channel_current->channel_id;
 
     result = blecdev_enable( &enable_config );
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_enable failed" );
@@ -699,6 +726,9 @@ inline void BleManager::state_disable_process( void )
     result = blecdev_disable();
     ASSERT_DYGMA( result == RESULT_OK || result == RESULT_BUSY, "blecdev_disable failed" );
     EXIT_IF_NOK( result );
+
+    /* Disable the BLE config module */
+    BleConfig.cfg_disable();
 
     state_set( BLEM_STATE_DISABLED );
 
@@ -780,6 +810,110 @@ inline void BleManager::state_machine( void )
 }
 
 /********************************************************************/
+/*                            BLE Config                            */
+/********************************************************************/
+
+inline result_t BleManager::blecfg_init( void )
+{
+    result_t result = RESULT_ERR;
+    BleConfig::blecfg_config_t config;
+
+    config.p_instance = this;
+    config.event_cb = blecfg_event_cb;
+
+    result = BleConfig.cfg_init( &config );
+    EXIT_IF_ERR( result, "blecfg_init failed" );
+
+_EXIT:
+    return result;
+}
+
+inline void BleManager::blecfg_event_type_channel_bond_save_success_process( void )
+{
+    /* The channel bond save process has finished successfully, signing the connection is paired - deactivate HMI */
+    BleHmi.hmi_deactivate();
+
+    /* Set the connected state */
+    state_set( BLEM_STATE_CONNECTED );
+}
+
+inline void BleManager::blecfg_event_type_channel_bond_save_failed_process( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* The channel bond save signing an unexpected issue. Restart the BLE connection process */
+
+    /* Reset the BLE connection process */
+    result = restart( );
+    ASSERT_DYGMA( result == RESULT_OK, "BLE restart failed" );
+
+    UNUSED( result );
+}
+
+inline void BleManager::blecfg_event_type_channel_erase_success_process( void )
+{
+    uint8_t channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
+
+    /* Update the HMI module */
+    BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
+}
+
+inline void BleManager::blecfg_event_type_channel_erase_failed_process( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* The erase process failed signing an unexpected issue. Restart the BLE connection process */
+
+    /* Reset the BLE connection process */
+    result = restart( );
+    ASSERT_DYGMA( result == RESULT_OK, "BLE restart failed" );
+
+    UNUSED( result );
+}
+
+inline void BleManager::blecfg_event_process( BleConfig::blecfg_event_type_t event_type )
+{
+    switch( event_type )
+    {
+        case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_SUCCESS:
+
+            blecfg_event_type_channel_bond_save_success_process();
+
+            break;
+
+        case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_FAILED:
+
+            blecfg_event_type_channel_bond_save_failed_process();
+
+            break;
+
+        case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_ERASE_SUCCESS:
+
+            blecfg_event_type_channel_erase_success_process();
+
+            break;
+
+        case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_ERASE_FAILED:
+
+            blecfg_event_type_channel_erase_failed_process();
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled BLE Config event" );
+
+            break;
+    }
+}
+
+void BleManager::blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type )
+{
+    BleManager * p_bleManager = (BleManager *)p_instance;
+    p_bleManager->blecfg_event_process( event_type );
+}
+
+/********************************************************************/
 /*                             BLE HMI                              */
 /********************************************************************/
 
@@ -802,7 +936,7 @@ inline void BleManager::blehmi_event_type_channel_change_process( BleHmi::blehmi
 {
     result_t result = RESULT_ERR;
 
-    if( p_channel_change_param->channel_id == p_channel_current->id )
+    if( p_channel_change_param->channel_id == p_channel_current->channel_id )
     {
         /* If the the BLE is connected via this channel, then deactivate the HMI and continue with normal BLE operation */
         if( is_connected() == true )
@@ -815,7 +949,7 @@ inline void BleManager::blehmi_event_type_channel_change_process( BleHmi::blehmi
     }
 
     /* Save the new channel id */
-    cfgmem_current_channel_id_save( p_channel_change_param->channel_id );
+    BleConfig.cfg_current_channel_set( p_channel_change_param->channel_id );
 
     /* Reset the BLE connection process */
     result = restart( );
@@ -1196,115 +1330,115 @@ const kbdif_handlers_t BleManager::kbdif_handlers =
     .command_event_cb = kbdif_command_event_cb,
 };
 
-/****************************************************/
-/*                   Config Memory                  */
-/****************************************************/
-
-void BleManager::cfgmem_ble_name_save( const ble_device_name_t * p_name_config, const ble_device_name_t * p_device_name )
-{
-    result_t result = RESULT_ERR;
-    ble_device_name_t ble_name;
-
-    ASSERT_DYGMA( strlen(p_device_name->name) < (sizeof(ble_name) - 1), "The new BLE name exceeds the available space" );
-
-    /* Fill the name cache. We use the cache to make sure the space in memory has always the same structure - filling the trailing space with 0x00 */
-    memset( &ble_name, 0x00, sizeof(ble_name) );
-    ble_name = *p_device_name;
-
-    result = ConfigManager.config_item_update( p_name_config, &ble_name, sizeof(ble_device_name_t) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_channel_id_save( const channel_t * p_channel, uint8_t id )
-{
-    result_t result = RESULT_ERR;
-
-    result = ConfigManager.config_item_update( &p_channel->id, &id, sizeof( p_channel->id ) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_channel_peer_id_save( const channel_t * p_channel, pm_peer_id_t peer_id )
-{
-    result_t result = RESULT_ERR;
-
-    result = ConfigManager.config_item_update( &p_channel->peer_id, &peer_id, sizeof( p_channel->peer_id ) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_channel_device_address_save( const channel_t * p_channel, const ble_device_addr_t * p_device_addr )
-{
-    result_t result = RESULT_ERR;
-
-    result = ConfigManager.config_item_update( &p_channel->device_addr, p_device_addr, sizeof( p_channel->device_addr ) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_channel_device_name_save( const channel_t * p_channel, const ble_device_name_t * p_device_name )
-{
-    cfgmem_ble_name_save( &p_channel->device_name, p_device_name );
-}
-
-void BleManager::cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local )
-{
-    cfgmem_ble_name_save( &p_config->device_name_local, p_device_name_local );
-}
-
-void BleManager::cfgmem_current_channel_id_save( uint8_t channel_id )
-{
-    result_t result = RESULT_ERR;
-
-    BLE_LOG_INFO("*** Ble_manager: Saving current channel %d -> %d", p_config->current_channel_id, channel_id );
-
-    result = ConfigManager.config_item_update( &p_config->current_channel_id, &channel_id, sizeof( p_config->current_channel_id) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_force_ble_save( bool_t force_ble )
-{
-    result_t result = RESULT_ERR;
-
-    result = ConfigManager.config_item_update( &p_config->force_ble, &force_ble, sizeof( p_config->force_ble) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleManager::cfgmem_channel_reset( const channel_t * p_channel, uint8_t id )
-{
-    ble_device_addr_t default_device_addr;
-    ble_device_name_t default_device_name;
-
-    memset( &default_device_addr, 0xFF, sizeof(default_device_addr) );
-    memset( &default_device_name, 0x00, sizeof(default_device_name) );
-
-    cfgmem_channel_id_save( p_channel, id );
-    cfgmem_channel_peer_id_save( p_channel, PM_PEER_ID_INVALID );
-    cfgmem_channel_device_address_save( p_channel, &default_device_addr );
-    cfgmem_channel_device_name_save( p_channel, &default_device_name );
-}
-
-void BleManager::cfgmem_config_reset()
-{
-    uint8_t i;
-    for( i = 0; i < BLE_CHANNELS_COUNT; i++)
-    {
-        cfgmem_channel_reset( &p_config->channels[i], i );
-    }
-
-    cfgmem_device_name_local_save( &ble_device_name_local );
-    cfgmem_current_channel_id_save( 0 );
-    cfgmem_force_ble_save( false );
-}
+///****************************************************/
+///*                   Config Memory                  */
+///****************************************************/
+//
+//void BleManager::cfgmem_ble_name_save( const ble_device_name_t * p_name_config, const ble_device_name_t * p_device_name )
+//{
+//    result_t result = RESULT_ERR;
+//    ble_device_name_t ble_name;
+//
+//    ASSERT_DYGMA( strlen(p_device_name->name) < (sizeof(ble_name) - 1), "The new BLE name exceeds the available space" );
+//
+//    /* Fill the name cache. We use the cache to make sure the space in memory has always the same structure - filling the trailing space with 0x00 */
+//    memset( &ble_name, 0x00, sizeof(ble_name) );
+//    ble_name = *p_device_name;
+//
+//    result = ConfigManager.config_item_update( p_name_config, &ble_name, sizeof(ble_device_name_t) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_channel_id_save( const channel_t * p_channel, uint8_t id )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_channel->id, &id, sizeof( p_channel->id ) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_channel_peer_id_save( const channel_t * p_channel, pm_peer_id_t peer_id )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_channel->peer_id, &peer_id, sizeof( p_channel->peer_id ) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_channel_device_address_save( const channel_t * p_channel, const ble_device_addr_t * p_device_addr )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_channel->device_addr, p_device_addr, sizeof( p_channel->device_addr ) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_channel_device_name_save( const channel_t * p_channel, const ble_device_name_t * p_device_name )
+//{
+//    cfgmem_ble_name_save( &p_channel->device_name, p_device_name );
+//}
+//
+//void BleManager::cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local )
+//{
+//    cfgmem_ble_name_save( &p_config->device_name_local, p_device_name_local );
+//}
+//
+//void BleManager::cfgmem_current_channel_id_save( uint8_t channel_id )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    BLE_LOG_INFO("*** Ble_manager: Saving current channel %d -> %d", p_config->current_channel_id, channel_id );
+//
+//    result = ConfigManager.config_item_update( &p_config->current_channel_id, &channel_id, sizeof( p_config->current_channel_id) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_force_ble_save( bool_t force_ble )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_config->force_ble, &force_ble, sizeof( p_config->force_ble) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
+//
+//void BleManager::cfgmem_channel_reset( const channel_t * p_channel, uint8_t id )
+//{
+//    ble_device_addr_t default_device_addr;
+//    ble_device_name_t default_device_name;
+//
+//    memset( &default_device_addr, 0xFF, sizeof(default_device_addr) );
+//    memset( &default_device_name, 0x00, sizeof(default_device_name) );
+//
+//    cfgmem_channel_id_save( p_channel, id );
+//    cfgmem_channel_peer_id_save( p_channel, PM_PEER_ID_INVALID );
+//    cfgmem_channel_device_address_save( p_channel, &default_device_addr );
+//    cfgmem_channel_device_name_save( p_channel, &default_device_name );
+//}
+//
+//void BleManager::cfgmem_config_reset()
+//{
+//    uint8_t i;
+//    for( i = 0; i < BLE_CHANNELS_COUNT; i++)
+//    {
+//        cfgmem_channel_reset( &p_config->channels[i], i );
+//    }
+//
+//    cfgmem_device_name_local_save( &ble_device_name_local );
+//    cfgmem_current_channel_id_save( 0 );
+//    cfgmem_force_ble_save( false );
+//}
 
 /****************************************************/
 /*                        API                       */
@@ -1315,35 +1449,35 @@ result_t BleManager::init()
     result_t result = RESULT_ERR;
 //    uint8_t i;
 
-    /* First, get the current BLE configuration */
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BLE_CONNECTIONS, (const void **)&p_config );
-    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+//    /* First, get the current BLE configuration */
+//    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BLE_CONNECTIONS, (const void **)&p_config );
+//    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+//
+//    // For now lest think that if this variable is invalid, restart everything.
+//    if( p_config->current_channel_id == 0xFF )
+//    {
+//        cfgmem_config_reset();
+//    }
 
-    // For now lest think that if this variable is invalid, restart everything.
-    if( p_config->current_channel_id == 0xFF )
-    {
-        cfgmem_config_reset();
-    }
+    /* Initialize the BLE config interface */
+    result = blecfg_init();
+    EXIT_IF_ERR( result, "blecfg_init failed" );
 
     /* Initialize the keyboard interface */
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
-    BLE_LOG_DEBUG("Ble_manager: Current channel %i", p_config->current_channel_id);
+//    BLE_LOG_DEBUG("Ble_manager: Current channel %i", p_config->current_channel_id);
 
     /* Initialize the Low Level BLE */
     result = ble_ll_init();
     EXIT_IF_ERR( result, "ble_ll_init failed" );
 
-    /* Initialize the channels */
-    result = channels_init();
-    EXIT_IF_ERR( result, "channels_init failed" );
+//    /* Initialize the channels */
+//    result = channels_init();
+//    EXIT_IF_ERR( result, "channels_init failed" );
 
 //    update_channel_and_name();
-
-    /* Initialize the BLE HMI config */
-    result = BleConfig.cfg_init();
-    EXIT_IF_ERR( result, "BleCfg.cfg_init failed" );
 
     /* Initialize the BLE HMI interface */
     result = blehmi_init();
@@ -1511,12 +1645,12 @@ void BleManager::battery_level_update( uint8_t battery_level )
 
 void BleManager::force_ble_set( bool enabled )
 {
-    cfgmem_force_ble_save( enabled );
+    BleConfig.cfg_force_ble_set( enabled );
 }
 
 bool BleManager::force_ble_get( void )
 {
-    return p_config->force_ble;
+    return BleConfig.cfg_force_ble_get();
 }
 
 void BleManager::run()
