@@ -77,6 +77,7 @@ class BleHmi
 
         void hmi_advertise( uint8_t channel_current_id, uint8_t channels_bonded_mask );
         void hmi_read_bond_code( void );
+        void hmi_update( uint8_t channel_current_id, uint8_t channels_bonded_mask );
 
         void hmi_run( void );
 

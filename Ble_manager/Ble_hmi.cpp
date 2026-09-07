@@ -666,6 +666,14 @@ void BleHmi::hmi_read_bond_code( void )
     hmi_led_effect_reading_bond_code();
 }
 
+void BleHmi::hmi_update( uint8_t channel_current_id, uint8_t channels_bonded_mask )
+{
+    hmi_channel_current_id = channel_current_id;
+    hmi_channels_bonded_mask = channels_bonded_mask;
+
+    hmi_led_effect_update( LedModeSerializable_BluetoothPairing::Channels::NOT_CONNECTED, hmi_channel_current_id, false );
+}
+
 void BleHmi::hmi_run( void )
 {
     hmi_state_machine();
