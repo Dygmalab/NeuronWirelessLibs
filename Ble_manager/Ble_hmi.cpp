@@ -161,6 +161,9 @@ inline void BleHmi::hmi_state_channel_erase_key_wait_process( void )
     /* Report the channel erase has been requested */
     evt_param.channel_erase.channel_id = hmi_channel_erase_id;
     hmi_event_process( p_instance, BLEHMI_EVENT_TYPE_CHANNEL_ERASE, &evt_param);
+
+    /* Wait for the erase key release */
+    hmi_state_set( BLEHMI_STATE_CHANNEL_ERASE_KEY_RELEASE_WAIT );
 }
 
 inline void BleHmi::hmi_state_machine( void )
@@ -194,6 +197,12 @@ inline void BleHmi::hmi_state_machine( void )
         case BLEHMI_STATE_CHANNEL_ERASE_KEY_WAIT:
 
             hmi_state_channel_erase_key_wait_process();
+
+            break;
+
+        case BLEHMI_STATE_CHANNEL_ERASE_KEY_RELEASE_WAIT:
+
+            /* Just waiting for the erase key release event in hmi_key_process */
 
             break;
 
@@ -447,6 +456,7 @@ inline result_t BleHmi::hmi_key_process( kbdapi_key_t * p_key )
             break;
 
         case BLEHMI_STATE_CHANNEL_ERASE_KEY_WAIT:
+        case BLEHMI_STATE_CHANNEL_ERASE_KEY_RELEASE_WAIT:
 
             result = hmi_key_channel_erase_key_wait_process( p_key );
 

@@ -90,7 +90,7 @@ class BleHmi
             BLEHMI_STATE_ACTIVE,
             BLEHMI_STATE_READING_BOND_CODE,
             BLEHMI_STATE_CHANNEL_ERASE_KEY_WAIT,
-            BLEHMI_STATE_CHANNEL_ERASE,
+            BLEHMI_STATE_CHANNEL_ERASE_KEY_RELEASE_WAIT,
         } blehmi_state_t;
 
         blehmi_state_t hmi_state;
