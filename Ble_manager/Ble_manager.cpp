@@ -828,7 +828,7 @@ _EXIT:
     return result;
 }
 
-inline void BleManager::blecfg_event_type_channel_bond_save_success_process( void )
+inline void BleManager::blecfg_event_type_channel_bond_save_success_process( BleConfig::blecfg_evt_channel_bond_save_success_param_t * p_channel_bond_save_success_param )
 {
     /* The channel bond save process has finished successfully, signing the connection is paired - deactivate HMI */
     BleHmi.hmi_deactivate();
@@ -837,7 +837,7 @@ inline void BleManager::blecfg_event_type_channel_bond_save_success_process( voi
     state_set( BLEM_STATE_CONNECTED );
 }
 
-inline void BleManager::blecfg_event_type_channel_bond_save_failed_process( void )
+inline void BleManager::blecfg_event_type_channel_bond_save_failed_process( BleConfig::blecfg_evt_channel_bond_save_failed_param_t * p_channel_bond_save_failed_param )
 {
     result_t result = RESULT_ERR;
 
@@ -850,15 +850,31 @@ inline void BleManager::blecfg_event_type_channel_bond_save_failed_process( void
     UNUSED( result );
 }
 
-inline void BleManager::blecfg_event_type_channel_erase_success_process( void )
+inline void BleManager::blecfg_event_type_channel_erase_success_process( BleConfig::blecfg_evt_channel_erase_success_param_t * p_channel_erase_success_param )
 {
-    uint8_t channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
+    result_t result = RESULT_ERR;
+    uint8_t channels_bond_mask;
 
-    /* Update the HMI module */
-    BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
+    /* Check if we have erased the currently used channel */
+    if( p_channel_current != NULL && p_channel_erase_success_param->channel_id == p_channel_current->channel_id )
+    {
+        /* The channel is not valid any more. Reset the BLE connection process. */
+        result = restart( );
+        ASSERT_DYGMA( result == RESULT_OK, "BLE restart failed" );
+    }
+    else
+    {
+        /* Another channel has been erased -> Update the HMI module */
+
+        channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
+
+        BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
+    }
+
+    UNUSED( result );
 }
 
-inline void BleManager::blecfg_event_type_channel_erase_failed_process( void )
+inline void BleManager::blecfg_event_type_channel_erase_failed_process( BleConfig::blecfg_evt_channel_erase_failed_param_t * p_channel_erase_failed_param )
 {
     result_t result = RESULT_ERR;
 
@@ -871,31 +887,31 @@ inline void BleManager::blecfg_event_type_channel_erase_failed_process( void )
     UNUSED( result );
 }
 
-inline void BleManager::blecfg_event_process( BleConfig::blecfg_event_type_t event_type )
+inline void BleManager::blecfg_event_process( BleConfig::blecfg_event_type_t event_type, BleConfig::blecfg_evt_param_t * p_param )
 {
     switch( event_type )
     {
         case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_SUCCESS:
 
-            blecfg_event_type_channel_bond_save_success_process();
+            blecfg_event_type_channel_bond_save_success_process( &p_param->channel_bond_save_success );
 
             break;
 
         case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_FAILED:
 
-            blecfg_event_type_channel_bond_save_failed_process();
+            blecfg_event_type_channel_bond_save_failed_process( &p_param->channel_bond_save_failed );
 
             break;
 
         case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_ERASE_SUCCESS:
 
-            blecfg_event_type_channel_erase_success_process();
+            blecfg_event_type_channel_erase_success_process( &p_param->channel_erase_success );
 
             break;
 
         case BleConfig::BLECFG_EVENT_TYPE_CHANNEL_ERASE_FAILED:
 
-            blecfg_event_type_channel_erase_failed_process();
+            blecfg_event_type_channel_erase_failed_process( &p_param->channel_erase_failed );
 
             break;
 
@@ -907,10 +923,10 @@ inline void BleManager::blecfg_event_process( BleConfig::blecfg_event_type_t eve
     }
 }
 
-void BleManager::blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type )
+void BleManager::blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type, BleConfig::blecfg_evt_param_t * p_param  )
 {
     BleManager * p_bleManager = (BleManager *)p_instance;
-    p_bleManager->blecfg_event_process( event_type );
+    p_bleManager->blecfg_event_process( event_type, p_param );
 }
 
 /********************************************************************/
@@ -960,7 +976,12 @@ inline void BleManager::blehmi_event_type_channel_change_process( BleHmi::blehmi
 
 inline void BleManager::blehmi_event_type_channel_erase_process( BleHmi::blehmi_evt_channel_erase_param_t * p_channel_erase_param )
 {
-    ASSERT_DYGMA( false, "Unhandled blehmi_event_type_channel_erase_process" );
+    result_t result = RESULT_ERR;
+
+    result = BleConfig.cfg_channel_id_erase( p_channel_erase_param->channel_id );
+    ASSERT_DYGMA( result == RESULT_OK, "cfg_channel_id_erase failed" );
+
+    UNUSED( result );
 }
 
 inline void BleManager::blehmi_event_type_bond_code_ready_process( BleHmi::blehmi_evt_bond_code_ready_param_t * p_bond_code_ready_param )

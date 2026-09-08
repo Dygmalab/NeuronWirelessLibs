@@ -21,34 +21,40 @@
 static const ble_device_name_t ble_device_name_local = { BLE_DEVICE_NAME };
 
 /****************************************************/
-/*                    HMI events                    */
+/*                    CFG events                    */
 /****************************************************/
 
-inline void BleConfig::cfg_event_process( void * p_instance, blecfg_event_type_t event_type )
+inline void BleConfig::cfg_event_process( void * p_instance, blecfg_event_type_t event_type, blecfg_evt_param_t * p_param )
 {
     if( event_cb == NULL )
     {
         return;
     }
 
-    event_cb( p_instance, event_type );
+    event_cb( p_instance, event_type, p_param );
 }
 
 /********************************************************************/
 /*                 Low Level BLE - Composite device                 */
 /********************************************************************/
 
-inline result_t BleConfig::ble_ll_event_type_peer_erased( void )
+inline result_t BleConfig::ble_ll_event_type_peer_app_data_stored( void )
 {
-    if( cfg_state != BLECFG_STATE_PEER_ERASE_WAIT )
+    blecfg_evt_param_t evt_param;
+    blecfg_evt_channel_bond_save_success_param_t * p_channel_bond_save_success = &evt_param.channel_bond_save_success;
+
+    if( cfg_state != BLECFG_STATE_BOND_MAKE_WAIT )
     {
-        ASSERT_DYGMA( false, "Unexpected BLE peer erase detected (success)" );
+        ASSERT_DYGMA( false, "Unexpected BLE peer application data store detected (success)" );
 
         return RESULT_OK;   /* The event has been consumed */
     }
 
-    /* Clear the erase peer ID */
-    cfg_peer_erase_id = PM_PEER_ID_INVALID;
+    /* Prepare the event parameter */
+    p_channel_bond_save_success->channel_id = cfg_channel_bond_id;
+
+    /* Clear the bond channel ID */
+    cfg_channel_bond_id = BLECFG_CHANNEL_ID_INVALID;
 
     /* Refresh the list of channels */
     cfg_channels_load();
@@ -57,13 +63,87 @@ inline result_t BleConfig::ble_ll_event_type_peer_erased( void )
     cfg_state_set( BLECFG_STATE_ENABLED );
 
     /* Report the peer erase success event */
-    cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_ERASE_SUCCESS );
+    cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_SUCCESS, &evt_param );
+
+    return RESULT_OK;   /* The event has been consumed */
+}
+
+inline result_t BleConfig::ble_ll_event_type_peer_app_data_store_failed( void )
+{
+    blecfg_evt_param_t evt_param;
+    blecfg_evt_channel_bond_save_failed_param_t * p_channel_bond_save_failed = &evt_param.channel_bond_save_failed;
+
+    ASSERT_DYGMA( false, "BLE peer application data store not expected to fail." );
+
+    if( cfg_state != BLECFG_STATE_BOND_MAKE_WAIT )
+    {
+        ASSERT_DYGMA( false, "Unexpected BLE peer application data store detected (failure)" );
+
+        return RESULT_OK;   /* The event has been consumed */
+    }
+
+    /*
+     * We currently do not expect the application data store to fail. As a failsafe, we just cancel the store process by refreshing the list of channels and
+     * returning to the enabled state.
+     */
+
+    /* Prepare the event parameter */
+    p_channel_bond_save_failed->channel_id = cfg_channel_bond_id;
+
+    /* Clear the bond channel ID */
+    cfg_channel_bond_id = BLECFG_CHANNEL_ID_INVALID;
+
+    /* Refresh the list of channels */
+    cfg_channels_load();
+
+    /* Return to the enabled state */
+    cfg_state_set( BLECFG_STATE_ENABLED );
+
+    /* Report the peer erase failure event */
+    cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_FAILED, &evt_param );
+
+    return RESULT_OK;   /* The event has been consumed */
+}
+
+inline result_t BleConfig::ble_ll_event_type_peer_erased( void )
+{
+    blecfg_evt_param_t evt_param;
+    blecfg_evt_channel_erase_success_param_t * p_channel_erase_success = &evt_param.channel_erase_success;
+
+    if( cfg_state != BLECFG_STATE_PEER_ERASE_WAIT )
+    {
+        ASSERT_DYGMA( false, "Unexpected BLE peer erase detected (success)" );
+
+        return RESULT_OK;   /* The event has been consumed */
+    }
+
+    /* Prepare the event parameter */
+    p_channel_erase_success->channel_id = cfg_channel_erase_id;
+
+    /* Clear the erase peer ID */
+    cfg_channel_erase_id = BLECFG_CHANNEL_ID_INVALID;
+    cfg_peer_erase_id = PM_PEER_ID_INVALID;
+
+    /* Refresh the list of channels */
+    cfg_channels_load();
+
+    /* Return to the enabled state */
+    cfg_state_set( BLECFG_STATE_ENABLED );
+
+    /* Report the peer erase success event only if we have deleted a valid peer */
+    if( p_channel_erase_success->channel_id != BLECFG_CHANNEL_ID_INVALID )
+    {
+        cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_ERASE_SUCCESS, &evt_param );
+    }
 
     return RESULT_OK;   /* The event has been consumed */
 }
 
 inline result_t BleConfig::ble_ll_event_type_peer_erase_failed( void )
 {
+    blecfg_evt_param_t evt_param;
+    blecfg_evt_channel_erase_failed_param_t * p_channel_erase_failed = &evt_param.channel_erase_failed;
+
     ASSERT_DYGMA( false, "BLE peer erase not expected to fail." );
 
     if( cfg_state != BLECFG_STATE_PEER_ERASE_WAIT )
@@ -78,7 +158,11 @@ inline result_t BleConfig::ble_ll_event_type_peer_erase_failed( void )
      * returning to the enabled state.
      */
 
+    /* Prepare the event parameter */
+    p_channel_erase_failed->channel_id = cfg_channel_erase_id;
+
     /* Clear the erase peer ID */
+    cfg_channel_erase_id = BLECFG_CHANNEL_ID_INVALID;
     cfg_peer_erase_id = PM_PEER_ID_INVALID;
 
     /* Refresh the list of channels */
@@ -87,8 +171,11 @@ inline result_t BleConfig::ble_ll_event_type_peer_erase_failed( void )
     /* Return to the enabled state */
     cfg_state_set( BLECFG_STATE_ENABLED );
 
-    /* Report the peer erase failure event */
-    cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_ERASE_FAILED );
+    /* Report the peer erase failure event only if we tried to delete a valid peer */
+    if( p_channel_erase_failed->channel_id != BLECFG_CHANNEL_ID_INVALID )
+    {
+        cfg_event_process( p_instance, BLECFG_EVENT_TYPE_CHANNEL_ERASE_FAILED, &evt_param );
+    }
 
     return RESULT_OK;   /* The event has been consumed */
 }
@@ -99,6 +186,18 @@ inline result_t BleConfig::ble_ll_event_process( blecdev_event_type_t event_type
 
     switch( event_type )
     {
+        case BLECDEV_EVENT_TYPE_PEER_APP_DATA_STORED:
+
+            result = ble_ll_event_type_peer_app_data_stored();
+
+            break;
+
+        case BLECDEV_EVENT_TYPE_PEER_APP_DATA_STORE_FAILED:
+
+            result = ble_ll_event_type_peer_app_data_store_failed();
+
+            break;
+
         case BLECDEV_EVENT_TYPE_PEER_ERASED:
 
             result = ble_ll_event_type_peer_erased();
@@ -132,7 +231,6 @@ inline void BleConfig::cfg_channel_reset( blecfg_channel_t * p_channel, uint8_t 
     p_channel->channel_id = channel_id;
     p_channel->peer_id = PM_PEER_ID_INVALID;
 }
-
 
 inline result_t BleConfig::cfg_channel_erase( blecfg_channel_t * p_channel )
 {
@@ -308,8 +406,8 @@ inline result_t BleConfig::cfg_channels_load( void )
     result_t result_aux = RESULT_ERR;
 
     pm_peer_id_t peer_list[ BLECFG_CHANNELS_COUNT ];
+    uint32_t peer_list_id;
     uint32_t peer_cnt;
-    uint32_t peer_id;
 
     /* Initialy reset all channels */
     cfg_channels_reset();
@@ -320,14 +418,14 @@ inline result_t BleConfig::cfg_channels_load( void )
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_peer_list_get failed" );
     EXIT_IF_ERR( result, "blecdev_peer_list_get failed" );
 
-    for( peer_id = 0; peer_id < peer_cnt; peer_id++ )
+    for( peer_list_id = 0; peer_list_id < peer_cnt; peer_list_id++ )
     {
-        result_aux = cfg_channel_peer_load( peer_id );
+        result_aux = cfg_channel_peer_load( peer_list[ peer_list_id ] );
         if( result_aux == RESULT_ERR )
         {
             /* The channel could not be loaded from this peer. It does not contain APP data. This can happen when the peer has been saved in the peer manager
              * but we could not add our app data to that peer. E.g. due to a system failure during the process. We need to clear the peer from the peer memory */
-            cfg_channel_peer_erase( peer_id );
+            cfg_channel_peer_erase( peer_list[ peer_list_id ] );
         }
     }
 
@@ -362,6 +460,7 @@ inline void BleConfig::cfg_state_disabled_set( void )
 {
     /* Clear the handling values */
     cfg_channel_bond_id = BLECFG_CHANNEL_ID_INVALID;
+    cfg_channel_erase_id = BLECFG_CHANNEL_ID_INVALID;
     cfg_peer_erase_id = PM_PEER_ID_INVALID;
 
     /* Now move to the disabled state */
@@ -377,13 +476,13 @@ inline void BleConfig::cfg_state_disabled_set( void )
 //    cfg_state_set( BLECFG_STATE_LOAD_PEERS );
 //}
 
-inline void BleConfig::cfg_state_peer_erase_set( pm_peer_id_t peer_id )
-{
-    cfg_peer_erase_id = peer_id;
-
-    /* Set the Load peers state */
-    cfg_state_set( BLECFG_STATE_PEER_ERASE );
-}
+//inline void BleConfig::cfg_state_peer_erase_set( pm_peer_id_t peer_id )
+//{
+//    cfg_peer_erase_id = peer_id;
+//
+//    /* Set the Load peers state */
+//    cfg_state_set( BLECFG_STATE_PEER_ERASE );
+//}
 
 //inline void BleConfig::cfg_state_load_peers_process( void )
 //{
@@ -442,6 +541,9 @@ inline void BleConfig::cfg_state_bond_make_process( void )
     /* Request the peer app data store */
     result = blecdev_peer_app_data_store( p_channel->peer_id, &peer_app_data, sizeof( peer_app_data ) );
     ASSERT_DYGMA( result == RESULT_OK, "blecdev_peer_app_data_store failed" );
+
+    /* Wait for the peer app data store finish */
+    cfg_state_set( BLECFG_STATE_BOND_MAKE_WAIT );
 
     UNUSED( result );
 }
@@ -649,6 +751,7 @@ result_t BleConfig::cfg_init( const blecfg_config_t * p_config )
 
     /* Prepare the handling values */
     cfg_channel_bond_id = BLECFG_CHANNEL_ID_INVALID;
+    cfg_channel_erase_id = BLECFG_CHANNEL_ID_INVALID;
     cfg_peer_erase_id = PM_PEER_ID_INVALID;
 
     /* Event callback */
@@ -745,6 +848,33 @@ result_t BleConfig::cfg_channel_bond_save( const blecfg_channel_t * p_blecfg_cha
 uint8_t BleConfig::cfg_channels_bond_mask_get( void )
 {
     return cfg_channels_bond_mask;
+}
+
+result_t BleConfig::cfg_channel_id_erase( uint8_t channel_id )
+{
+    result_t result = RESULT_ERR;
+    blecfg_channel_t * p_channel;
+
+    ASSERT_DYGMA( channel_id < BLECFG_CHANNELS_COUNT, "Invalid BLE channel id" );
+
+    /* Get the relating cfg channel */
+    p_channel = &cfg_channels[ channel_id ];
+
+    /* Check the channel is the bound one */
+    if( p_channel->peer_id == PM_PEER_ID_INVALID )
+    {
+        return RESULT_ERR;
+    }
+
+    /* Initiate the channel erase process */
+    result = cfg_channel_erase( p_channel );
+    EXIT_IF_NOK( result );
+
+    /* The process has started, save the channel id */
+    cfg_channel_erase_id = channel_id;
+
+_EXIT:
+    return result;
 }
 
 void BleConfig::cfg_force_ble_set( bool enabled )

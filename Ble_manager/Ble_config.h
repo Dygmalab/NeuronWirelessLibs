@@ -51,7 +51,35 @@ class BleConfig
             BLECFG_EVENT_TYPE_CHANNEL_ERASE_FAILED,
         } blecfg_event_type_t;
 
-        typedef void (* blecfg_event_cb)( void * p_instance, blecfg_event_type_t event_type );
+        typedef struct
+        {
+            uint8_t channel_id;
+        } blecfg_evt_channel_bond_save_success_param_t;
+
+        typedef struct
+        {
+            uint8_t channel_id;
+        } blecfg_evt_channel_bond_save_failed_param_t;
+
+        typedef struct
+        {
+            uint8_t channel_id;
+        } blecfg_evt_channel_erase_success_param_t;
+
+        typedef struct
+        {
+            uint8_t channel_id;
+        } blecfg_evt_channel_erase_failed_param_t;
+
+        typedef union
+        {
+            blecfg_evt_channel_bond_save_success_param_t channel_bond_save_success;
+            blecfg_evt_channel_bond_save_failed_param_t channel_bond_save_failed;
+            blecfg_evt_channel_erase_success_param_t channel_erase_success;
+            blecfg_evt_channel_erase_failed_param_t channel_erase_failed;
+        } blecfg_evt_param_t;
+
+        typedef void (* blecfg_event_cb)( void * p_instance, blecfg_event_type_t event_type, blecfg_evt_param_t * p_param );
 
         typedef struct PACK
         {
@@ -85,6 +113,7 @@ class BleConfig
         void cfg_current_channel_set( uint8_t channel_id );
         const blecfg_channel_t * cfg_current_channel_get( void );
         result_t cfg_channel_bond_save( const blecfg_channel_t * p_blecfg_channel );
+        result_t cfg_channel_id_erase( uint8_t channel_id );
 
         uint8_t cfg_channels_bond_mask_get( void );
         void cfg_force_ble_set( bool enabled );
@@ -124,14 +153,17 @@ class BleConfig
         uint8_t cfg_channels_bond_mask;
 
         uint8_t cfg_channel_bond_id;
+        uint8_t cfg_channel_erase_id;
         pm_peer_id_t cfg_peer_erase_id;
 
         /* Event callback */
         void * p_instance;
         blecfg_event_cb event_cb;
 
-        inline void cfg_event_process( void * p_instance, blecfg_event_type_t event_type );
+        inline void cfg_event_process( void * p_instance, blecfg_event_type_t event_type, blecfg_evt_param_t * p_param );
 
+        inline result_t ble_ll_event_type_peer_app_data_stored( void );
+        inline result_t ble_ll_event_type_peer_app_data_store_failed( void );
         inline result_t ble_ll_event_type_peer_erased( void );
         inline result_t ble_ll_event_type_peer_erase_failed( void );
         inline result_t ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
@@ -151,7 +183,7 @@ class BleConfig
         inline void cfg_state_set( blecfg_state_t blecfg_state );
         inline void cfg_state_disabled_set( void );
 //        inline void cfg_state_load_peers_set( void );
-        inline void cfg_state_peer_erase_set( pm_peer_id_t peer_id );
+//        inline void cfg_state_peer_erase_set( pm_peer_id_t peer_id );
         inline void cfg_state_disabled_process( void );
         inline void cfg_state_enabled_process( void );
         inline void cfg_state_bond_make_process( void );

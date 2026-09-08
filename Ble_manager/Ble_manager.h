@@ -179,11 +179,11 @@ class BleManager
     inline void state_machine( void );
 
     inline result_t blecfg_init( void );
-    inline void blecfg_event_type_channel_bond_save_success_process( void );
-    inline void blecfg_event_type_channel_bond_save_failed_process( void );
-    inline void blecfg_event_type_channel_erase_success_process( void );
-    inline void blecfg_event_type_channel_erase_failed_process( void );
-    inline void blecfg_event_process( BleConfig::blecfg_event_type_t event_type );
+    inline void blecfg_event_type_channel_bond_save_success_process( BleConfig::blecfg_evt_channel_bond_save_success_param_t * p_channel_bond_save_success_param );
+    inline void blecfg_event_type_channel_bond_save_failed_process( BleConfig::blecfg_evt_channel_bond_save_failed_param_t * p_channel_bond_save_failed_param );
+    inline void blecfg_event_type_channel_erase_success_process( BleConfig::blecfg_evt_channel_erase_success_param_t * p_channel_erase_success_param );
+    inline void blecfg_event_type_channel_erase_failed_process( BleConfig::blecfg_evt_channel_erase_failed_param_t * p_channel_erase_failed_param );
+    inline void blecfg_event_process( BleConfig::blecfg_event_type_t event_type, BleConfig::blecfg_evt_param_t * p_param );
 
     inline result_t blehmi_init( void );
     inline void blehmi_event_type_channel_change_process( BleHmi::blehmi_evt_channel_change_param_t * p_channel_change_param );
@@ -238,7 +238,7 @@ class BleManager
     static kbdapi_event_result_t kbdif_command_event_cb( void * p_instance, const char * p_command );
 
     static void ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
-    static void blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type );
+    static void blecfg_event_cb( void * p_instance, BleConfig::blecfg_event_type_t event_type, BleConfig::blecfg_evt_param_t * p_param );
     static void blehmi_event_cb( void * p_instance, BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 };
 
