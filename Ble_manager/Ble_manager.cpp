@@ -665,7 +665,7 @@ inline void BleManager::state_enable_process( void )
     blecdev_enable_conf_t enable_config;
 
     /* Wait until softdevice-dependent ConfigManager processes are finished */
-    if( ConfigManager.is_busy() == true )
+    if( BleConfig.cfg_is_busy() == true )
     {
         return;
     }
@@ -718,7 +718,7 @@ inline void BleManager::state_disable_process( void )
     result_t result = RESULT_ERR;
 
     /* Wait until softdevice-dependent ConfigManager processes are finished */
-    if( ConfigManager.is_busy() == true )
+    if( BleConfig.cfg_is_busy() == true )
     {
         return;
     }

@@ -699,6 +699,22 @@ bool BleConfig::cfg_is_enabled( void )
     return ( cfg_state == BLECFG_STATE_DISABLED ) ? false : true;
 }
 
+bool BleConfig::cfg_is_busy( void )
+{
+    if( ConfigManager.is_busy() == true )
+    {
+        return true;
+    }
+    else if( cfg_state == BLECFG_STATE_DISABLED || cfg_state == BLECFG_STATE_ENABLED )
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
 const ble_device_name_t * BleConfig::cfg_ble_device_name_local_get( void )
 {
     return &p_ble_config->device_name_local;

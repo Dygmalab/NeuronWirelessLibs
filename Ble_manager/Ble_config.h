@@ -78,6 +78,7 @@ class BleConfig
         void cfg_disable( void );
 
         bool cfg_is_enabled( void );
+        bool cfg_is_busy( void );
 
         const ble_device_name_t * cfg_ble_device_name_local_get( void );
 
