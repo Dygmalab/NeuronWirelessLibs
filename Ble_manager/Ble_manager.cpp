@@ -830,7 +830,14 @@ _EXIT:
 
 inline void BleManager::blecfg_event_type_channel_bond_save_success_process( BleConfig::blecfg_evt_channel_bond_save_success_param_t * p_channel_bond_save_success_param )
 {
-    /* The channel bond save process has finished successfully, signing the connection is paired - deactivate HMI */
+    uint8_t channels_bond_mask;
+
+    /* The channel bond save process has finished successfully, signing the connection is paired */
+
+    /* Update and deactivate HMI */
+    channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
+
+    BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
     BleHmi.hmi_deactivate();
 
     /* Set the connected state */
