@@ -18,7 +18,6 @@
 #include "Ble_hmi.h"
 #include "kbd_if_manager.h"
 #include "LEDEffect-Bluetooth-Pairing-Defy.h"
-#include "LEDManager.h"
 
 #define HMI_CHANNEL_ERASE_KEY_HOLD_TIMEOUT_MS       3000    /* 3 seconds */
 
@@ -123,7 +122,7 @@ inline void BleHmi::hmi_state_channel_erase_key_wait_set( void )
 
 inline void BleHmi::hmi_state_enabled_process( void )
 {
-    if( hmi_activate_req_flag == true )
+    if( hmi_activate_req_flag == true && LEDManager.led_effect_prio_lock_check( &LEDManager_prio_lock ) == true )
     {
         hmi_state_active_set();
         return;
@@ -494,14 +493,14 @@ inline void BleHmi::hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_
 
 inline void BleHmi::hmi_led_effect_on( void )
 {
-    LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
+    LEDManager.led_effect_prio_set( &LEDManager_prio_lock, LEDEffect::LED_EFFECT_TYPE_BLUETOOTH_PAIRING );
 }
 
 inline void BleHmi::hmi_led_effect_off( void )
 {
     /* Exit the Bluetooth led effect */
     LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BT_LED_EFFECT, false );
-    LEDManager.led_effect_reset_prio();
+    LEDManager.led_effect_prio_reset( &LEDManager_prio_lock );
     LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
 }
 
@@ -598,6 +597,9 @@ result_t BleHmi::hmi_init( const blehmi_config_t * p_config )
     /* Initialize the key report lock */
     result = kbdapi_key_report_lock_init( &kbdapi_key_report_lock );
     EXIT_IF_ERR( result, "kbdapi_key_report_lock_init failed" );
+
+    /* Initialize the LED Manager priority effect lock */
+    LEDManager_prio_lock = 0;
 
     /* Event callback */
     this->p_instance = p_config->p_instance;

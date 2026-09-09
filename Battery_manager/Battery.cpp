@@ -22,7 +22,6 @@
 #include "Communications.h"
 #include "Config_manager.h"
 #include "Kaleidoscope-FocusSerial.h"
-#include "LEDManager.h"
 #include "FirmwareVersion.h"
 
 #include "kbd_if_manager.h"
@@ -42,6 +41,8 @@ uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
 Battery::bat_status_side_t Battery::right = {4 , 0,0,false,0,false};
 Battery::bat_status_side_t Battery::left = {4 , 0,0,false,0,false}; 
+
+LEDManager::LEDManager_prio_lock_t Battery::LEDManager_prio_lock = 0;
 
 bool inline filterHand(Communications_protocol::Devices incomingDevice, bool right_or_left)
 {
@@ -291,14 +292,14 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
 
     if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
     {
-        LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
+        LEDManager.led_effect_prio_set( &LEDManager_prio_lock, LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
         LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true );
     }
 
     if ( p_key->toggled_off == true )
     {
         LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false );
-        LEDManager.led_effect_reset_prio();
+        LEDManager.led_effect_prio_reset( &LEDManager_prio_lock );
         LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT );
     }
 

@@ -22,6 +22,7 @@
 #include "ble_types.h"
 #include "kbd_if.h"
 #include "keyboard_api.h"
+#include "LEDManager.h"
 #include "Time_counter.h"
 
 class BleHmi
@@ -97,6 +98,8 @@ class BleHmi
 
         kbdif_t * p_kbdif = NULL;
         kbdapi_key_report_lock_t kbdapi_key_report_lock;
+
+        LEDManager::LEDManager_prio_lock_t LEDManager_prio_lock;
 
         bool_t hmi_activate_req_flag;
         bool_t hmi_deactivate_req_flag;

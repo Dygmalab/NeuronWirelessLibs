@@ -21,6 +21,7 @@
 #include <cstdint>
 
 #include "kbd_if.h"
+#include "LEDManager.h"
 #include "Time_counter.h"
 
 #define DISCONNECT_GRACE_TIMEOUT_MS     3000
@@ -121,6 +122,8 @@ class Battery {
 
     static bat_status_side_t right;
     static bat_status_side_t left; 
+
+    static LEDManager::LEDManager_prio_lock_t LEDManager_prio_lock;
 
     static const kbdif_handlers_t kbdif_handlers;
 
