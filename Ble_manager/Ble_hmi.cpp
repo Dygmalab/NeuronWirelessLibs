@@ -355,14 +355,21 @@ _EXIT:
     if ( result == RESULT_ERR )
     {
         /* Check the Bluetooth Pairing key has been press in the HMI active state */
-        if( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING && p_key->toggled_on == true )
+        if( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING )
         {
-            /* Exit the HMI Active state */
-            hmi_deactivate();
+            if( p_key->toggled_on == true )
+            {
+                /* Exit the HMI Active state */
+                hmi_deactivate();
+            }
+
+            return RESULT_OK; /* The Bluetooth pairing key is consumed */
         }
+
+        return RESULT_ERR;  /* The key is ignored */
     }
 
-    return RESULT_OK; /* The key is always consumed in HMI active state */
+    return RESULT_OK;
 }
 
 inline result_t BleHmi::hmi_key_reading_bond_code_process( kbdapi_key_t * p_key )
