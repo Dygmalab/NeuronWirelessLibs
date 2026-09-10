@@ -176,6 +176,12 @@ inline void BleManager::ble_ll_event_type_advertising_process( void )
     BleHmi.hmi_advertise( p_channel_current->channel_id, channels_bond_mask );
 }
 
+inline void BleManager::ble_ll_event_type_advertising_failed_process( void )
+{
+    /* Set the advertising fail state */
+    state_set( BLEM_STATE_ADVERTISING_FAIL );
+}
+
 inline void BleManager::ble_ll_event_type_sec_bond_code_req_process( void )
 {
     ASSERT_DYGMA( p_channel_current->peer_id == PM_PEER_ID_INVALID, "Security pairing process unexpectedly for the already paired device" );
@@ -278,11 +284,7 @@ void BleManager::ble_ll_event_process( blecdev_event_type_t event_type, blecdev_
 
         case BLECDEV_EVENT_TYPE_ADVERTISING_FAILED:
 
-#warning "BLECDEV_EVENT_TYPE_ADVERTISING_FAILED not handled"
-
-            /* Previously, the system went to sleep, sending the sleep message to keyscanner. What should we do now in the new system? FAILURE event? */
-
-            ASSERT_DYGMA( false, "BLECDEV_EVENT_TYPE_ADVERTISING_FAILED not handled" );
+            ble_ll_event_type_advertising_failed_process();
 
             break;
 
@@ -781,7 +783,27 @@ _EXIT:
     return;
 }
 
+inline void BleManager::state_advertising_fail_process( void )
+{
+    result_t result = RESULT_ERR;
 
+    /* Disable the BLE Manager */
+    result = blem_disable();
+    ASSERT_DYGMA( result != RESULT_ERR, "blem_disable failed" );
+    EXIT_IF_NOK( result );
+
+    /* De-assert the enabled flag */
+    enabled_flag = false;
+
+    /* Disable the HMI machine */
+    BleHmi.hmi_disable();
+
+    /*
+     * NOTE: Entering the true sleep should be done through some system-level Power module. Such module does not exist at this point.
+     */
+
+    /* Enter the true sleep */
+    LEDManager.true_sleep_enter();
 
 _EXIT:
     return;
@@ -836,6 +858,12 @@ inline void BleManager::state_machine( void )
         case BLEM_STATE_RESTART:
 
             state_restart_process();
+
+            break;
+
+        case BLEM_STATE_ADVERTISING_FAIL:
+
+            state_advertising_fail_process();
 
             break;
 

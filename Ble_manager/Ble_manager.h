@@ -122,6 +122,7 @@ class BleManager
 
         BLEM_STATE_DISABLE,
         BLEM_STATE_RESTART,
+        BLEM_STATE_ADVERTISING_FAIL,
     } blem_state_t;
 
 
@@ -166,6 +167,7 @@ class BleManager
     void ble_ll_whitelist_configure( void );
 
     inline void ble_ll_event_type_advertising_process( void );
+    inline void ble_ll_event_type_advertising_failed_process( void );
     inline void ble_ll_event_type_sec_bond_code_req_process( void );
     inline void ble_ll_event_type_sec_bond_success_process( blecdev_evt_sec_bond_success_param_t * p_sec_bond_success_param );
     inline void ble_ll_event_type_sec_bond_failed_process( blecdev_evt_sec_bond_failed_param_t * p_sec_bond_failed_param );
@@ -180,6 +182,7 @@ class BleManager
     inline void state_enable_process( void );
     inline void state_disable_process( void );
     inline void state_restart_process( void );
+    inline void state_advertising_fail_process( void );
     inline void state_machine( void );
 
     inline result_t blecfg_init( void );
