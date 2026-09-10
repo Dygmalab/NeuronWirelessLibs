@@ -119,7 +119,9 @@ class BleManager
         BLEM_STATE_ADVERTISING,
         BLEM_STATE_PAIRING,
         BLEM_STATE_CONNECTED,
+
         BLEM_STATE_DISABLE,
+        BLEM_STATE_RESTART,
     } blem_state_t;
 
 
@@ -155,7 +157,6 @@ class BleManager
     /* Flags */
     bool_t enable_request_flag;
     bool_t enabled_flag;
-    bool_t restart_flag;
 
 //    result_t channels_init( void );
 //    void channels_update( void );
@@ -172,10 +173,13 @@ class BleManager
     inline void ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param );
     void ble_ll_event_process( blecdev_event_type_t event_type, blecdev_evt_param_t * p_param );
 
+    result_t blem_disable( void );
+
     inline void state_set( blem_state_t blem_state );
     inline void state_disabled_process( void );
     inline void state_enable_process( void );
     inline void state_disable_process( void );
+    inline void state_restart_process( void );
     inline void state_machine( void );
 
     inline result_t blecfg_init( void );

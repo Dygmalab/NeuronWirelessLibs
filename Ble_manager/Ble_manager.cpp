@@ -331,6 +331,33 @@ void BleManager::ble_ll_event_cb( void * p_instance, blecdev_event_type_t event_
 }
 
 /********************************************************************/
+/*                           BLE Manager                            */
+/********************************************************************/
+
+result_t BleManager::blem_disable( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Wait until softdevice-dependent ConfigManager processes are finished */
+    if( BleConfig.cfg_is_busy() == true )
+    {
+        return RESULT_BUSY;
+    }
+
+    result = blecdev_disable();
+    ASSERT_DYGMA( result == RESULT_OK || result == RESULT_BUSY, "blecdev_disable failed" );
+    EXIT_IF_NOK( result );
+
+    /* Disable the BLE config module */
+    BleConfig.cfg_disable();
+
+    state_set( BLEM_STATE_DISABLED );
+
+_EXIT:
+    return result;
+}
+
+/********************************************************************/
 /*                             Channels                             */
 /********************************************************************/
 
@@ -717,39 +744,44 @@ inline void BleManager::state_disable_process( void )
 {
     result_t result = RESULT_ERR;
 
-    /* Wait until softdevice-dependent ConfigManager processes are finished */
-    if( BleConfig.cfg_is_busy() == true )
-    {
-        return;
-    }
-
-    result = blecdev_disable();
-    ASSERT_DYGMA( result == RESULT_OK || result == RESULT_BUSY, "blecdev_disable failed" );
+    /* Disable the BLE Manager */
+    result = blem_disable();
+    ASSERT_DYGMA( result != RESULT_ERR, "blem_disable failed" );
     EXIT_IF_NOK( result );
 
-    /* Disable the BLE config module */
-    BleConfig.cfg_disable();
+    /* De-assert the enabled flag */
+    enabled_flag = false;
 
-    state_set( BLEM_STATE_DISABLED );
+    /* Disable the HMI machine */
+    BleHmi.hmi_disable();
 
-    /* Check if the BLE module is being restarted */
-    if( restart_flag == true )
-    {
-        result = enable();
-        ASSERT_DYGMA( result == RESULT_OK, "The BLE enable should always work at this point" );
+_EXIT:
+    return;
+}
 
-        /*
-         * IMPORTANT:
-         * Keeping the HMI enabled as well as the enabled_flag asserted to prevent flicker upon the restart
-         */
-    }
-    else
-    {
-        enabled_flag = false;
+inline void BleManager::state_restart_process( void )
+{
+    result_t result = RESULT_ERR;
 
-        /* Disable the HMI machine */
-        BleHmi.hmi_disable();
-    }
+    /* Disable the BLE Manager */
+    result = blem_disable();
+    ASSERT_DYGMA( result != RESULT_ERR, "blem_disable failed" );
+    EXIT_IF_NOK( result );
+
+    /* Re-enable the BLE again to, effectively, perform the restart */
+    result = enable();
+    ASSERT_DYGMA( result == RESULT_OK, "The BLE enable should always work at this point" );
+
+    /*
+     * IMPORTANT:
+     * Keeping the HMI enabled as well as the enabled_flag asserted to prevent flicker upon the restart
+     */
+
+_EXIT:
+    return;
+}
+
+
 
 _EXIT:
     return;
@@ -801,9 +833,15 @@ inline void BleManager::state_machine( void )
 
             break;
 
+        case BLEM_STATE_RESTART:
+
+            state_restart_process();
+
+            break;
+
         default:
 
-            ASSERT_DYGMA( false, "Unhanled BLE Manager state" );
+            ASSERT_DYGMA( false, "Unhandled BLE Manager state" );
 
             break;
     }
@@ -1514,7 +1552,6 @@ result_t BleManager::init()
     /* Initialize the flags */
     enable_request_flag = false;
     enabled_flag = false;
-    restart_flag = false;
 
 //    hmi_activate_req_flag = false;
 //    hmi_deactivate_req_flag = false;
@@ -1638,22 +1675,16 @@ result_t BleManager::disable( void )
 
 result_t BleManager::restart( void )
 {
-    result_t result = RESULT_ERR;
-
     if( state == BLEM_STATE_DISABLED )
     {
         ASSERT_DYGMA( false, "Invalid attempt to restart disabled the BLE" );
         return RESULT_ERR;
     }
 
-    result = disable();
-    EXIT_IF_ERR( result, "disable failed" );
+    /* Move to the restart state */
+    state_set( BLEM_STATE_RESTART );
 
-    /* Set the restart flag */
-    restart_flag = true;
-
-_EXIT:
-    return result;
+    return RESULT_OK;
 }
 
 bool_t BleManager::is_enabled( void )
