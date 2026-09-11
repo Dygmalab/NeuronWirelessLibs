@@ -1068,6 +1068,15 @@ inline void BleManager::blehmi_event_type_bond_code_ready_process( BleHmi::blehm
     UNUSED( result );
 }
 
+inline void BleManager::blehmi_event_type_deactivate_request_process( void )
+{
+    /* If the the BLE is connected, then deactivate the HMI and continue with normal BLE operation. Otherwise ignore the request */
+    if( is_connected() == true )
+    {
+        BleHmi.hmi_deactivate();
+    }
+}
+
 inline void BleManager::blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param )
 {
     switch( event_type )
@@ -1087,6 +1096,12 @@ inline void BleManager::blehmi_event_process( BleHmi::blehmi_event_type_t event_
         case BleHmi::BLEHMI_EVENT_TYPE_BOND_CODE_READY:
 
             blehmi_event_type_bond_code_ready_process( &p_param->bond_code_ready );
+
+            break;
+
+        case BleHmi::BLEHMI_EVENT_TYPE_DEACTIVATE_REQ:
+
+            blehmi_event_type_deactivate_request_process( );
 
             break;
 

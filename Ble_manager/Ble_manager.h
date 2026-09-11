@@ -196,6 +196,7 @@ class BleManager
     inline void blehmi_event_type_channel_change_process( BleHmi::blehmi_evt_channel_change_param_t * p_channel_change_param );
     inline void blehmi_event_type_channel_erase_process( BleHmi::blehmi_evt_channel_erase_param_t * p_channel_erase_param );
     inline void blehmi_event_type_bond_code_ready_process( BleHmi::blehmi_evt_bond_code_ready_param_t * p_bond_code_ready_param );
+    inline void blehmi_event_type_deactivate_request_process( void );
     inline void blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 
     result_t kbdif_initialize(void);

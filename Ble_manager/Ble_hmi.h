@@ -34,6 +34,7 @@ class BleHmi
             BLEHMI_EVENT_TYPE_CHANNEL_CHANGE = 1,
             BLEHMI_EVENT_TYPE_CHANNEL_ERASE,
             BLEHMI_EVENT_TYPE_BOND_CODE_READY,
+            BLEHMI_EVENT_TYPE_DEACTIVATE_REQ,
         } blehmi_event_type_t;
 
         typedef struct

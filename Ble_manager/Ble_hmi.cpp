@@ -358,8 +358,7 @@ _EXIT:
         {
             if( p_key->toggled_on == true )
             {
-                /* Exit the HMI Active state */
-                hmi_deactivate();
+                hmi_event_process( p_instance, BLEHMI_EVENT_TYPE_DEACTIVATE_REQ, NULL );
             }
 
             return RESULT_OK; /* The Bluetooth pairing key is consumed */
