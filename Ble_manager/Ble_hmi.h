@@ -79,7 +79,8 @@ class BleHmi
 
         void hmi_advertise( uint8_t channel_current_id, uint8_t channels_bonded_mask );
         void hmi_read_bond_code( void );
-        void hmi_update( uint8_t channel_current_id, uint8_t channels_bonded_mask );
+        void hmi_update_connected_channel( uint8_t channel_current_id );
+        void hmi_update_bonded_channels( uint8_t channels_bonded_mask );
 
         void hmi_run( void );
 
@@ -109,9 +110,10 @@ class BleHmi
         ble_bond_code_t hmi_bond_code;
         uint8_t hmi_bond_code_len;
 
-        uint8_t hmi_channel_current_id;
         uint8_t hmi_channel_erase_id;
         uint8_t hmi_channels_bonded_mask;
+        uint8_t hmi_channel_con_id;
+        uint8_t hmi_channel_adv_id;
 
         dl_timer_t hmi_timer;
 
@@ -144,11 +146,11 @@ class BleHmi
         inline result_t hmi_key_channel_erase_key_wait_process( kbdapi_key_t * p_key );
         inline result_t hmi_key_process( kbdapi_key_t * p_key );
 
-        inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
+        inline void hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, uint8_t channels_bonded_mask, bool_t erase_status );
         inline void hmi_led_effect_on( void );
         inline void hmi_led_effect_off( void );
-        inline void hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status );
-        inline void hmi_led_effect_adv( void );
+        inline void hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, uint8_t channels_bonded_mask, bool_t erase_status );
+        inline void hmi_led_effect_adv( uint8_t channel_adv_id, uint8_t channels_bonded_mask );
         inline void hmi_led_effect_reading_bond_code( void );
 
         result_t kbdif_initialize(void);

@@ -481,8 +481,12 @@ inline result_t BleHmi::hmi_key_process( kbdapi_key_t * p_key )
 /*                  HMI LED effects                 */
 /****************************************************/
 
-inline void BleHmi::hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status )
+inline void BleHmi::hmi_led_effect_set( uint8_t channel_con_id, uint8_t channel_adv_id, uint8_t channels_bonded_mask, bool_t erase_status )
 {
+    hmi_channels_bonded_mask = channels_bonded_mask;
+    hmi_channel_con_id = channel_con_id;
+    hmi_channel_adv_id = channel_adv_id;
+
     LEDBluetoothPairingDefy.setPairedChannels( hmi_channels_bonded_mask );
     LEDBluetoothPairingDefy.setConnectedChannel( channel_con_id );
     LEDBluetoothPairingDefy.setAvertisingModeOn( channel_adv_id );
@@ -503,9 +507,9 @@ inline void BleHmi::hmi_led_effect_off( void )
     LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT ); // Disable LED fade effect.
 }
 
-inline void BleHmi::hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, bool_t erase_status )
+inline void BleHmi::hmi_led_effect_update( uint8_t channel_con_id, uint8_t channel_adv_id, uint8_t channels_bonded_mask, bool_t erase_status )
 {
-    hmi_led_effect_set( channel_con_id, channel_adv_id, erase_status );
+    hmi_led_effect_set( channel_con_id, channel_adv_id, channels_bonded_mask, erase_status );
 
     /* Update the led effect only if the HMI interface is active */
     if( hmi_is_active() == false )
@@ -516,9 +520,9 @@ inline void BleHmi::hmi_led_effect_update( uint8_t channel_con_id, uint8_t chann
     LEDManager.led_effect_refresh();
 }
 
-inline void BleHmi::hmi_led_effect_adv( void )
+inline void BleHmi::hmi_led_effect_adv( uint8_t channel_adv_id, uint8_t channels_bonded_mask )
 {
-    hmi_led_effect_update( LedModeSerializable_BluetoothPairing::Channels::NOT_CONNECTED, hmi_channel_current_id, false );
+    hmi_led_effect_update( LedModeSerializable_BluetoothPairing::Channels::NOT_CONNECTED, channel_adv_id, channels_bonded_mask, false );
 
     /* In case of the advertising, we want to activate the LED effect */
     if( hmi_is_active() == false )
@@ -610,9 +614,10 @@ result_t BleHmi::hmi_init( const blehmi_config_t * p_config )
     hmi_active_flag = false;
 
     /* Initialize channel IDs */
-    hmi_channel_current_id = 0;
     hmi_channel_erase_id = 0;
     hmi_channels_bonded_mask = 0x00;
+    hmi_channel_con_id = 0;
+    hmi_channel_adv_id = 0;
 
     /* Set the initial state */
     hmi_state = BLEHMI_STATE_DISABLED;
@@ -673,10 +678,8 @@ bool BleHmi::hmi_is_active( void )
 
 void BleHmi::hmi_advertise( uint8_t channel_current_id, uint8_t channels_bonded_mask )
 {
-    hmi_channel_current_id = channel_current_id;
-    hmi_channels_bonded_mask = channels_bonded_mask;
 
-    hmi_led_effect_adv();
+    hmi_led_effect_adv( channel_current_id, channels_bonded_mask );
 }
 
 void BleHmi::hmi_read_bond_code( void )
@@ -684,12 +687,14 @@ void BleHmi::hmi_read_bond_code( void )
     hmi_led_effect_reading_bond_code();
 }
 
-void BleHmi::hmi_update( uint8_t channel_current_id, uint8_t channels_bonded_mask )
+void BleHmi::hmi_update_connected_channel( uint8_t channel_current_id )
 {
-    hmi_channel_current_id = channel_current_id;
-    hmi_channels_bonded_mask = channels_bonded_mask;
+    hmi_led_effect_update( channel_current_id, LedModeSerializable_BluetoothPairing::Channels::NOT_ON_ADVERTISING, hmi_channels_bonded_mask, false );
+}
 
-    hmi_led_effect_update( LedModeSerializable_BluetoothPairing::Channels::NOT_CONNECTED, hmi_channel_current_id, false );
+void BleHmi::hmi_update_bonded_channels( uint8_t channels_bonded_mask )
+{
+    hmi_led_effect_update( hmi_channel_con_id, hmi_channel_adv_id, channels_bonded_mask, false );
 }
 
 void BleHmi::hmi_run( void )

@@ -244,6 +244,7 @@ inline void BleManager::ble_ll_event_type_peer_connected_process( blecdev_evt_pe
     ASSERT_DYGMA( p_peer_connected_param->peer_id == p_channel_current->peer_id, "BLE connected to an unexpected peer" );
 
     /* The connection is paired - deactivate */
+    BleHmi.hmi_update_connected_channel( p_channel_current->channel_id );
     BleHmi.hmi_deactivate();
 
     /* Set the connected state */
@@ -903,7 +904,8 @@ inline void BleManager::blecfg_event_type_channel_bond_save_success_process( Ble
     /* Update and deactivate HMI */
     channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
 
-    BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
+    BleHmi.hmi_update_bonded_channels( channels_bond_mask );
+    BleHmi.hmi_update_connected_channel( p_channel_current->channel_id );
     BleHmi.hmi_deactivate();
 
     /* Set the connected state */
@@ -941,7 +943,7 @@ inline void BleManager::blecfg_event_type_channel_erase_success_process( BleConf
 
         channels_bond_mask = BleConfig.cfg_channels_bond_mask_get();
 
-        BleHmi.hmi_update( p_channel_current->channel_id, channels_bond_mask );
+        BleHmi.hmi_update_bonded_channels( channels_bond_mask );
     }
 
     UNUSED( result );
