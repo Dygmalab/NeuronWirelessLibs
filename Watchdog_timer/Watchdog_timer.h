@@ -37,6 +37,8 @@ extern "C"
 {
 #endif
 
+#include "dl_middleware.h"
+
 #include "nrf_drv_wdt.h"
 
 // UART debug log

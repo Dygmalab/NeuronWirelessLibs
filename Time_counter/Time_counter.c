@@ -279,13 +279,15 @@ void timer_counter_init(uint32_t micros_resolution_)
     timer_config.p_context = NULL;
 
     ret_code_t ret = nrf_drv_timer_init(&driver_timer, &timer_config, _nrf_drv_event_handler);
-    APP_ERROR_CHECK(ret);
+    ASSERT_DYGMA( ret == NRF_SUCCESS, "nrf_drv_timer_init failed" );
 
     nrf_drv_timer_extended_compare(&driver_timer, TIMER_OVFLW_CHANNEL, TIMER_SYSTIM_TICK_OVFLW_VAL, TIMER_OVFLW_SHORT_CLEAR, true);
 
     nrf_drv_timer_enable(&driver_timer);
 
     initialized = true;
+
+    UNUSED( ret );
 }
 
 systim_tick_t timer_counter_get_micros(void)

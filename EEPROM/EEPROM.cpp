@@ -250,7 +250,6 @@ result_t EEPROMClass::fstorage_init( void )
     {
         return RESULT_ERR;
     }
-    APP_ERROR_CHECK(rc);
 
     return RESULT_OK;
 }
