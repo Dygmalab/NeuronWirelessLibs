@@ -241,6 +241,12 @@ inline void BleManager::ble_ll_event_type_sec_bond_failed_process( blecdev_evt_s
 
 inline void BleManager::ble_ll_event_type_peer_connected_process( blecdev_evt_peer_connected_param_t * p_peer_connected_param )
 {
+    if( state == BLEM_STATE_PAIRING )
+    {
+        /* Ignore the peer connected event when in the pairing state - waiting for the bond to be finished first */
+        return;
+    }
+
     ASSERT_DYGMA( p_peer_connected_param->peer_id == p_channel_current->peer_id, "BLE connected to an unexpected peer" );
 
     /* The connection is paired - deactivate */
