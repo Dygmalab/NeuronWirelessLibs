@@ -378,7 +378,7 @@ inline result_t BleHmi::hmi_key_reading_bond_code_process( kbdapi_key_t * p_key 
     /* The key is read upon its release */
     if( p_key->toggled_off == false )
     {
-        return RESULT_OK; /* The key is always consumed in HMI reading bond code state */
+        return RESULT_ERR;
     }
 
     /* Convert the key to numeric ASCII */
@@ -390,7 +390,8 @@ inline result_t BleHmi::hmi_key_reading_bond_code_process( kbdapi_key_t * p_key 
 
     if( hmi_bond_code_len < sizeof( hmi_bond_code ) )
     {
-        return RESULT_OK; /* The key is always consumed in HMI HMI reading bond code state */
+        /* The key is consumed but the code is not finished yet. Finish here */
+        return RESULT_OK;
     }
 
     /* Return to the HMI active state */
@@ -401,7 +402,7 @@ inline result_t BleHmi::hmi_key_reading_bond_code_process( kbdapi_key_t * p_key 
     hmi_event_process( p_instance, BLEHMI_EVENT_TYPE_BOND_CODE_READY, &evt_param);
 
 _EXIT:
-    return RESULT_OK; /* The key is always consumed in HMI HMI reading bond code state */
+    return result;
 }
 
 inline result_t BleHmi::hmi_key_channel_erase_key_wait_process( kbdapi_key_t * p_key )
