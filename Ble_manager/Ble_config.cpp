@@ -804,7 +804,7 @@ bool BleConfig::cfg_is_enabled( void )
 
 bool BleConfig::cfg_is_busy( void )
 {
-    if( ConfigManager.is_busy() == true )
+    if( ConfigManager.is_busy() == true || nrf_fstorage_is_busy( NULL ) == true )
     {
         return true;
     }
