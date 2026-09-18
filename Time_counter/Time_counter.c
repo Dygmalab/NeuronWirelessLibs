@@ -342,3 +342,16 @@ bool timer_check( dl_timer_t * p_timer )
 
     return ret_val;
 }
+
+void timer_delay_ms( uint32_t timeout_ms )
+{
+    dl_timer_t delay_timer = 0;
+
+    //set the timer
+    timer_set_ms( &delay_timer, timeout_ms );
+
+    while ( !timer_check( &delay_timer ) )
+    {
+        mcu_sleep_control( );
+    }
+}

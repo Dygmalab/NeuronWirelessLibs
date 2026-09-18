@@ -52,6 +52,8 @@ void timer_set_ms( dl_timer_t * p_timer, uint32_t ms );
 void timer_set_us( dl_timer_t * p_timer, uint32_t us );
 bool timer_check( dl_timer_t * p_timer );
 
+void timer_delay_ms( uint32_t timeout_ms );
+
 #ifdef __cplusplus
 }
 #endif
