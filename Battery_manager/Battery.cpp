@@ -19,13 +19,13 @@
  */
 
 #include "Battery.h"
+#include "Ble_manager.h"
 #include "Communications.h"
 #include "Config_manager.h"
-#include "Kaleidoscope-FocusSerial.h"
 #include "FirmwareVersion.h"
+#include "Kaleidoscope-FocusSerial.h"
 
 #include "kbd_if_manager.h"
-
 
 #define NOT_CHARGING 0
 
