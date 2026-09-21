@@ -74,7 +74,7 @@ class BleManager
     bool_t is_enabled( void );
     bool_t is_connected( void );
 
-    void battery_level_update( uint8_t battery_level );
+    void battery_level_update( uint8_t bat_level );
 
     void force_ble_set( bool enabled );
     bool force_ble_get( void );
@@ -155,6 +155,9 @@ class BleManager
 
     kbdif_t * p_kbdif = NULL;
 
+    /* Battery value */
+    uint8_t battery_level;
+
     /* Flags */
     bool_t enable_request_flag;
     bool_t enabled_flag;
@@ -178,6 +181,7 @@ class BleManager
     result_t blem_disable( void );
 
     inline void state_set( blem_state_t blem_state );
+    inline void state_connected_set( void );
     inline void state_disabled_process( void );
     inline void state_enable_process( void );
     inline void state_disable_process( void );
@@ -198,6 +202,8 @@ class BleManager
     inline void blehmi_event_type_bond_code_ready_process( BleHmi::blehmi_evt_bond_code_ready_param_t * p_bond_code_ready_param );
     inline void blehmi_event_type_deactivate_request_process( void );
     inline void blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
+
+    void bat_level_update( void );
 
     result_t kbdif_initialize(void);
 //    inline kbdapi_event_result_t kbdif_key_event_process( kbdapi_key_t * p_key );

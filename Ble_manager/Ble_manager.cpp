@@ -50,6 +50,8 @@
     #define BLE_LOG_FLUSH()
 #endif /* BLE_MANAGER_DEBUG_LOG */
 
+#define BATTERY_LEVEL_INVALID       0xFF      /* The default/initial battery level is set to an invalid value */
+
 //void BleManager::enable(void)
 //{
 //    TinyUSBDevice.detach();
@@ -254,7 +256,7 @@ inline void BleManager::ble_ll_event_type_peer_connected_process( blecdev_evt_pe
     BleHmi.hmi_deactivate();
 
     /* Set the connected state */
-    state_set( BLEM_STATE_CONNECTED );
+    state_connected_set( );
 }
 
 inline void BleManager::ble_ll_event_type_peer_device_name_process( blecdev_evt_peer_device_name_param_t * p_peer_device_name_param )
@@ -680,6 +682,18 @@ inline void BleManager::state_set( blem_state_t blem_state )
     mcu_sleep_postpone();
 }
 
+inline void BleManager::state_connected_set( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Update the battery level */
+    bat_level_update();
+
+    state_set( BLEM_STATE_CONNECTED );
+
+    UNUSED( result );
+}
+
 inline void BleManager::state_disabled_process( void )
 {
     if( FirmwareVersion::keyboard_is_wireless() == false )
@@ -915,7 +929,7 @@ inline void BleManager::blecfg_event_type_channel_bond_save_success_process( Ble
     BleHmi.hmi_deactivate();
 
     /* Set the connected state */
-    state_set( BLEM_STATE_CONNECTED );
+    state_connected_set( );
 }
 
 inline void BleManager::blecfg_event_type_channel_bond_save_failed_process( BleConfig::blecfg_evt_channel_bond_save_failed_param_t * p_channel_bond_save_failed_param )
@@ -1125,6 +1139,27 @@ void BleManager::blehmi_event_cb( void * p_instance, BleHmi::blehmi_event_type_t
 {
     BleManager * p_bleManager = (BleManager *)p_instance;
     p_bleManager->blehmi_event_process( event_type, p_param );
+}
+
+/****************************************************/
+/*                Battery reporting                 */
+/****************************************************/
+
+void BleManager::bat_level_update( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Check if the BLE peer is connected and the battery level has been set */
+    if( is_connected() == false || battery_level == BATTERY_LEVEL_INVALID )
+    {
+        return;
+    }
+
+    /* Update the battery level */
+    result = blecdev_battery_level_set( battery_level );
+    ASSERT_DYGMA( result != RESULT_ERR, "blecdev_battery_level_set failed" );
+
+    UNUSED( result );
 }
 
 /****************************************************/
@@ -1600,6 +1635,9 @@ result_t BleManager::init()
     result = blehmi_init();
     EXIT_IF_ERR( result, "blehmi_init failed" );
 
+    /* Battery value */
+    battery_level = BATTERY_LEVEL_INVALID;
+
     /* Initialize the flags */
     enable_request_flag = false;
     enabled_flag = false;
@@ -1748,9 +1786,13 @@ bool_t BleManager::is_connected( void )
     return ( state == BLEM_STATE_CONNECTED ) ? true : false;
 }
 
-void BleManager::battery_level_update( uint8_t battery_level )
+void BleManager::battery_level_update( uint8_t bat_level )
 {
-#warning "BleManager::battery_level_update not implemented"
+    /* Update the battery level */
+    battery_level = bat_level;
+
+    /* Trigger the BLE battery level update */
+    bat_level_update( );
 }
 
 void BleManager::force_ble_set( bool enabled )
