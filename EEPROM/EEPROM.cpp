@@ -35,6 +35,11 @@ extern "C"
 {
 #endif
 
+/* FDS is used only for the memory structure calculation and correct placement of the keyboard configuration memory.
+ * DO NOT use it for anything else! */
+#include "fds.h"
+#include "fds_internal_defs.h"
+
 #include "nrf_fstorage.h"
 
 #ifdef SOFTDEVICE_PRESENT
@@ -67,7 +72,7 @@ extern "C"
     We reserve 2 pages 0x00073000 and 0x00074000 for the EEPROM class.
     The Bluetooth module uses the Nordic FDS library, and 3 pages are reserved for it from 0x00070000
     to 0x00072000 (pages 112, 113 and 114).
-    Pages 39 to 113 are free to be used by the main application.
+    Pages 39 to 111 are free to be used by the main application.
 
     Flash memory map:
         Page 127 (0x0007F000) -> MBR parameters storage. Last memory page.
@@ -83,14 +88,15 @@ extern "C"
         Page 118 (0x00076000) -> Bootloader.
         Page 117 (0x00075000) -> Bootloader.
 
-        Page 116 (0x00074000) -> EEPROM class. It uses fstorage library from the SDK.
-        Page 115 (0x00073000) -> EEPROM class.
 
-        Page 114 (0x00072000) -> FDS library used by the peer manager module in the Bluetooth.
-        Page 113 (0x00071000) -> FDS library.
-        Page 112 (0x00070000) -> FDS library.
+        Page 116 (0x00074000) -> FDS library used by the peer manager module in the Bluetooth.
+        Page 115 (0x00073000) -> FDS library.
+        Page 114 (0x00072000) -> FDS library
 
-        Page 113 (0x00069000) -> Max Main App.
+        Page 113 (0x00071000) -> EEPROM class. It uses fstorage library from the SDK.
+        Page 112 (0x00070000) -> EEPROM class..
+
+        Page 111 (0x0006F000) -> Max Main App.
         .
         .
         Page 39  (0x00027000) -> Min Main App.
@@ -108,6 +114,14 @@ extern "C"
           used by the EEPROM class. This way it is easier to add memory pages as we need them
           to be used by Kaleidoscope.
 */
+
+/* This is temporary check until all our Neuron Wireless projects are switched to the new FLASH structure */
+#if FDS_PHY_PAGES_RESERVED != 0
+#error "FDS_VIRTUAL_PAGES_RESERVED needs to be set to 0 in sdk_config.h after the last memory structure change"
+#endif /* FDS_PHY_PAGES_RESERVED */
+
+#define FLASH_FDS_SIZE                          ( FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof( uint32_t ) )
+
 #define FLASH_STORAGE_NUM_PAGES                 2
 #define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
 #define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
@@ -153,7 +167,7 @@ static inline uint32_t flash_first_page_start_addr_get(void)
 
     uint32_t end_addr = (bootloader_addr != 0xFFFFFFFF) ? bootloader_addr : (code_sz * page_sz);
 
-    return end_addr - FLASH_STORAGE_SIZE;
+    return end_addr - FLASH_FDS_SIZE - FLASH_STORAGE_SIZE;
 }
 
 static inline uint32_t flash_last_page_end_addr_get(void)
