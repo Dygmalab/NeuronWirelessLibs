@@ -23,45 +23,13 @@
 #include "EEPROM.h"
 #include "Time_counter.h"
 
-#include "kbd_memory.h"
-
 class ConfigManager
 {
     public:
 
-        typedef enum
-        {
-            CFG_ITEM_TYPE_DEVICE_SPEC = 1,
+        result_t init( void );
 
-            CFG_ITEM_TYPE_LEDS_LEDMANAGER = 10,
-            CFG_ITEM_TYPE_LEDS_PALETTE,
-            CFG_ITEM_TYPE_LEDS_COLORMAP,
-
-            CFG_ITEM_TYPE_BATTERY = 20,
-
-            CFG_ITEM_TYPE_BLE_CONNECTIONS = 30,
-
-            CFG_ITEM_TYPE_RF = 40,
-        } cfg_item_type_t;
-
-        typedef result_t (* cfg_item_request_cb)( cfg_item_type_t item_type, const void ** pp_item );
-        typedef result_t (* cfg_item_request_kbdmem_cb)( kbdmem_item_type_t item_type, const void ** pp_item );
-
-        typedef struct
-        {
-            uint8_t * p_config_cache;
-            uint16_t config_cache_size;
-
-            /* Callbacks */
-            cfg_item_request_cb item_request_cb;
-            cfg_item_request_kbdmem_cb item_request_kbdmem_cb;
-        } ConfigManager_config_t;
-
-    public:
-
-        result_t init( const ConfigManager_config_t * p_config );
-
-        result_t config_item_request( cfg_item_type_t item_type, const void ** pp_item );
+        result_t config_item_request( const void ** pp_config_item, uint16_t item_size );
         result_t config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size );
 
         bool_t is_busy( void );
@@ -69,12 +37,9 @@ class ConfigManager
         void run( void );
 
     private:
-        uint8_t * p_cache;      /* Must come from within the RAM space */
-        uint16_t cache_size;
 
-        /* Callbacks */
-        cfg_item_request_cb item_request_cb = nullptr;
-        cfg_item_request_kbdmem_cb item_request_kbdmem_cb = nullptr;
+        uint8_t cache[ FLASH_STORAGE_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
+        uint8_t * p_cache_pointer;
 
         bool_t item_validity_check( const void * p_item_add, uint16_t item_size );
 
@@ -89,10 +54,10 @@ class ConfigManager
     private:
 
         void kbdmem_ll_init( void );
-        INLINE result_t kbdmem_ll_item_request( kbdmem_item_type_t item_type, const void ** pp_item );
+        INLINE result_t kbdmem_ll_item_request( const void ** pp_config_item, uint16_t item_size );
         INLINE result_t kbdmem_ll_data_save( const void * p_mem_target, const void * p_data, uint16_t data_len );
 
-        static result_t kbdmem_ll_item_request_cb( void * p_instance, kbdmem_item_type_t item_type, const void ** pp_item );
+        static result_t kbdmem_ll_item_request_cb( void * p_instance, const void ** pp_config_item, uint16_t item_size );
         static result_t kbdmem_ll_data_save_cb( void * p_instance, const void * p_mem_target, const void * p_data, uint16_t data_len );
 
         /********************************************/

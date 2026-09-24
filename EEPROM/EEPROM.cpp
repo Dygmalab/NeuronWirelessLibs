@@ -122,14 +122,10 @@ extern "C"
 
 #define FLASH_FDS_SIZE                          ( FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof( uint32_t ) )
 
-#define FLASH_STORAGE_NUM_PAGES                 2
-#define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
-#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
-
 #define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
 #define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
 
-#define FLASH_STORAGE_ALIGN                     4       /* The FLASH data is aligned by 4 bytes */
+#define FLASH_STORAGE_ALIGN                     MCU_ALIGNMENT_SIZE       /* The FLASH data is aligned by 4 bytes */
 
 static inline uint32_t flash_first_page_start_addr_get(void);
 static inline uint32_t flash_last_page_end_addr_get(void);

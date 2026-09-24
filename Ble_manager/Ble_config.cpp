@@ -736,7 +736,7 @@ result_t BleConfig::cfg_init( const blecfg_config_t * p_config )
     result_t result = RESULT_ERR;
 
     /* First, get the current BLE configuration */
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BLE_CONNECTIONS, (const void **)&p_ble_config );
+    result = ConfigManager.config_item_request( (const void **)&p_ble_config, sizeof( ble_config_t ) );
     EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
     // For now lest think that if this variable is invalid, restart everything.

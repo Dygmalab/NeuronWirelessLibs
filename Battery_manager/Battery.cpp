@@ -66,7 +66,7 @@ result_t Battery::init()
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
     /* Get the battery savings mode configuration */
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BATTERY, (const void **)&p_battery_conf );
+    result = ConfigManager.config_item_request( (const void **)&p_battery_conf, sizeof( battery_conf_t ) );
     EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
     /* Check if the config is cleared */

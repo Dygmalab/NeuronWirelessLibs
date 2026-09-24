@@ -31,6 +31,10 @@
 #include "dl_middleware.h"
 #include "nrf_fstorage.h"
 
+#define FLASH_STORAGE_NUM_PAGES                 2
+#define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
+#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
+
 class EEPROMClass
 {
     public:

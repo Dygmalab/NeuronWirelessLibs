@@ -29,12 +29,6 @@
 
 class Battery {
    public:
-    typedef struct PACK
-    {
-        uint8_t saving_mode;;
-    } battery_conf_t;
-
-   public:
     result_t init( void );
     void run( void );
 
@@ -47,6 +41,11 @@ class Battery {
     result_t kbdif_initialize(void);
 
    private:
+
+    typedef struct PACK
+    {
+        uint8_t saving_mode;;
+    } battery_conf_t;
 
     static const battery_conf_t * p_battery_conf;
 

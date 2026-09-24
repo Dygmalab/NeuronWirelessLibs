@@ -33,16 +33,6 @@ class BleConfig
 {
     public:
 
-        typedef struct PACK
-        {
-//            channel_t channels[BLE_CHANNELS_COUNT];
-            ble_device_name_t device_name_local;    /* The local BLE device name */
-            uint8_t current_channel_id;             /* The ID of the currently selected channel */
-            bool_t force_ble;
-        } ble_config_t;
-
-    public:
-
         typedef enum
         {
             BLECFG_EVENT_TYPE_CHANNEL_BOND_SAVE_SUCCESS = 1,
@@ -122,6 +112,14 @@ class BleConfig
         void cfg_run( void );
 
     private:
+
+        typedef struct PACK
+        {
+//            channel_t channels[BLE_CHANNELS_COUNT];
+            ble_device_name_t device_name_local;    /* The local BLE device name */
+            uint8_t current_channel_id;             /* The ID of the currently selected channel */
+            bool_t force_ble;
+        } ble_config_t;
 
         typedef struct PACK
         {
