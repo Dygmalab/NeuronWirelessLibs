@@ -411,7 +411,7 @@ result_t EEPROMClass::erase(void)
     NRF_LOG_DEBUG("EEPROM: Erasing flash...");
     NRF_LOG_FLUSH();
 #endif
-    eeprom_busy_flag = false;
+    eeprom_busy_flag = true;
     ret_code_t ret_code = nrf_fstorage_erase(&fstorage_instance,
                                              FLASH_STORAGE_FIRST_PAGE_START_ADDR,
                                              FLASH_STORAGE_NUM_PAGES,
@@ -433,7 +433,7 @@ result_t EEPROMClass::erase(void)
            internal queue of operations is full.
         */
 
-        eeprom_busy_flag = true;
+        eeprom_busy_flag = false;
 
         return RESULT_ERR;
     }
