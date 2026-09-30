@@ -20,8 +20,15 @@
 #pragma once
 
 #include "dl_middleware.h"
+
+#include "Config_image.h"
 #include "EEPROM.h"
 #include "Time_counter.h"
+
+#define FLASH_IMAGE_NUM_PAGES           ( FLASH_STORAGE_NUM_PAGES / 2 )
+#define FLASH_IMAGE_SIZE                ( FLASH_IMAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )    /* Size of one image in the flash */
+
+#define CONFIG_CACHE_SIZE               CONFIG_IMAGE_DATA_SIZE(FLASH_IMAGE_SIZE)
 
 class ConfigManager
 {
@@ -38,7 +45,7 @@ class ConfigManager
 
     private:
 
-        uint8_t cache[ FLASH_STORAGE_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
+        uint8_t cache[ CONFIG_CACHE_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
         uint8_t * p_cache_pointer;
 
         bool_t item_validity_check( const void * p_item_add, uint16_t item_size );
@@ -72,6 +79,22 @@ class ConfigManager
         INLINE void eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type );
 
         static void eeprom_event_cb( void * p_instance, EEPROMClass::eeprom_event_type_t event_type );
+
+
+        /********************************************/
+        /*              Config Images               */
+        /********************************************/
+
+    private:
+
+        ConfigImage image_1;
+        ConfigImage image_2;
+
+        ConfigImage * p_image_primary;
+        ConfigImage * p_image_secondary;
+
+        INLINE result_t images_init( void );
+        INLINE void images_run( void );
 
         /****************************************************/
         /*                     Machine                      */

@@ -122,6 +122,7 @@ extern "C"
 
 #define FLASH_FDS_SIZE                          ( FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof( uint32_t ) )
 
+#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
 #define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
 #define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
 
@@ -281,9 +282,6 @@ result_t EEPROMClass::init( const eeprom_config_t * p_config )
     result = fstorage_init( );
     EXIT_IF_ERR( result, "fstorage_init failed" );
 
-    /* Initially, the whole EEPROM space is protected and forcing the erase needs to be called before any write */
-    addr_offset_protected = FLASH_STORAGE_SIZE;
-
     /* Set the flags */
     eeprom_busy_flag = false;
 
@@ -339,11 +337,6 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
         /* Nothing to write */
         return RESULT_OK;
     }
-    else if( addr_offset < addr_offset_protected )
-    {
-        ASSERT_DYGMA(false, "Trying to write into protected EEPROM space");
-        return RESULT_ERR;
-    }
     else if( addr_offset + data_size > FLASH_STORAGE_SIZE )
     {
         ASSERT_DYGMA(false, "EEPROM available space overflow");
@@ -394,8 +387,6 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
 
-    /* Shift the protected address offset */
-    addr_offset_protected = addr_offset + data_size;
 
     return RESULT_OK;
 }
@@ -446,9 +437,14 @@ result_t EEPROMClass::erase(void)
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
 
-    addr_offset_protected = 0;
-
     return RESULT_OK;
+}
+
+const void * EEPROMClass::data_ptr_get( uint32_t addr_offset )
+{
+    ASSERT_DYGMA( addr_offset < FLASH_STORAGE_SIZE, "EEPROMClass invalid addr_offset detected" );
+
+    return ( const void *)(flash_first_page_start_addr_get() + addr_offset);
 }
 
 EEPROMClass EEPROM;

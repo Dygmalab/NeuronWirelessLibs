@@ -20,6 +20,9 @@
 #include "Config_manager.h"
 #include "kbd_memory.h"
 
+#define FLASH_IMAGE_1_ADDR      0
+#define FLASH_IMAGE_2_ADDR      (FLASH_IMAGE_1_ADDR + FLASH_IMAGE_SIZE)
+
 bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t item_size )
 {
     /* Check the target is within the config space */
@@ -73,12 +76,16 @@ result_t ConfigManager::config_item_update( const void * p_config_item, const vo
 
 void ConfigManager::config_load( void )
 {
-    result_t result = RESULT_ERR;
-
-    result = EEPROM.read( 0, cache, sizeof( cache ) );
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.read failed" );
-
-    UNUSED( result );
+    if( p_image_primary->is_valid() == true )
+    {
+        p_image_primary->data_load( cache, sizeof( cache ) );
+    }
+    else
+    {
+        /* The config image is invalid. Hence we clear the cache by filling it with 0xFF which comes from original flash-clear behavior and
+         * is generally accepted with config-dependent modules for detecting invalid/cleared configuration space */
+        memset( cache, 0xFF, sizeof(cache) );
+    }
 }
 
 void ConfigManager::config_save_request( void )
@@ -132,7 +139,6 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
     return p_ConfigManager->kbdmem_ll_data_save( p_mem_target, p_data, data_len );
 }
 
-
 /********************************************/
 /*                 EEPROM                   */
 /********************************************/
@@ -182,6 +188,42 @@ INLINE result_t ConfigManager::eeprom_init( void )
 
 _EXIT:
     return result;
+}
+
+/********************************************/
+/*              Config Images               */
+/********************************************/
+
+INLINE result_t ConfigManager::images_init( void )
+{
+    result_t result = RESULT_ERR;
+
+    result = image_1.init( FLASH_IMAGE_1_ADDR, FLASH_IMAGE_SIZE );
+    EXIT_IF_ERR( result, "image_1.init failed" );
+
+    result = image_2.init( FLASH_IMAGE_2_ADDR, FLASH_IMAGE_SIZE );
+    EXIT_IF_ERR( result, "image_2.init failed" );
+
+    /* Resolve the primary image */
+    if( image_1.sequence_num_get() >= image_2.sequence_num_get() )
+    {
+        p_image_primary = &image_1;
+        p_image_secondary = &image_2;
+    }
+    else
+    {
+        p_image_primary = &image_2;
+        p_image_secondary = &image_1;
+    }
+
+_EXIT:
+    return result;
+}
+
+INLINE void ConfigManager::images_run( void )
+{
+    image_1.run( );
+    image_2.run( );
 }
 
 /********************************************/
@@ -327,6 +369,10 @@ result_t ConfigManager::init( void )
     result = eeprom_init();
     EXIT_IF_ERR( result, "eeprom_init failed" );
 
+    /* Initialize the configuration images */
+    result = images_init();
+    EXIT_IF_ERR( result, "images_init failed" );
+
     /* Get the config image */
     config_load();
 
@@ -352,6 +398,7 @@ bool_t ConfigManager::is_busy( void )
 void ConfigManager::run( void )
 {
     machine();
+    images_run();
 }
 
 class ConfigManager ConfigManager;

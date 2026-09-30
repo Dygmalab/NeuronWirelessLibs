@@ -31,9 +31,8 @@
 #include "dl_middleware.h"
 #include "nrf_fstorage.h"
 
-#define FLASH_STORAGE_NUM_PAGES                 2
+#define FLASH_STORAGE_NUM_PAGES                 4
 #define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
-#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
 
 class EEPROMClass
 {
@@ -60,13 +59,12 @@ class EEPROMClass
         result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
         result_t erase(void);
 
+        const void * data_ptr_get( uint32_t addr_offset );
+
     public:
         static void fstorage_evt_handler_nrf( nrf_fstorage_evt_t * p_evt );
 
     private:
-
-        /* Addresses */
-        uint32_t addr_offset_protected = 0;  /* Used to protect already written addresses to prevent multiple address writes */
 
         /* Flags */
         bool_t initialized_flag = false;
