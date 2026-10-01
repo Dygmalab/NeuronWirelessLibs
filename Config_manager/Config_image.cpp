@@ -28,10 +28,12 @@
 
 #define IMAGE_CRC_DEFAULT       0xFFFFFFFF
 
-#define IMAGE_HEADER_ADDRESS    ( image_address )
+#define IMAGE_HEADER_ADDRESS    ( image_address_offset )
 #define IMAGE_HEADER_SIZE       CONFIG_IMAGE_HEADER_SIZE
-#define IMAGE_DATA_ADDRESS      ( image_address + IMAGE_HEADER_SIZE )
+#define IMAGE_DATA_ADDRESS      ( image_address_offset + IMAGE_HEADER_SIZE )
 #define IMAGE_DATA_SIZE         CONFIG_IMAGE_DATA_SIZE( image_size )
+
+#define IMAGE_PAGE_CNT          ( image_size / FLASH_STORAGE_PAGE_SIZE )
 
 /*******************************************************/
 /*                        CRC32                        */
@@ -123,6 +125,29 @@ INLINE void ConfigImage::state_set( cfgimg_state_t cfgimg_state )
     mcu_sleep_postpone();
 }
 
+INLINE void ConfigImage::state_erase_process( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Set the EEPROM in progress flag */
+    flag_flash_in_progress = true;
+
+    /* Initiate the EEPROM erase process */
+    result = EEPROM.erase_offset( image_address_offset, IMAGE_PAGE_CNT);
+    STOP_IF_ERR( result, "EEPROM.erase failed" );
+    EXIT_IF_NOK( result );
+
+    state_set( CFGIMG_STATE_ERASE_WAIT );
+
+_EXIT:
+    if( result != RESULT_OK )
+    {
+        flag_flash_in_progress = false;
+    }
+
+    return;
+}
+
 INLINE void ConfigImage::state_machine( void )
 {
     switch( state )
@@ -133,9 +158,12 @@ INLINE void ConfigImage::state_machine( void )
 
             break;
 
-//        case CFGIMG_STATE_ERASE:
-//            break;
-//
+        case CFGIMG_STATE_ERASE:
+
+            state_erase_process();
+
+            break;
+
 //        case CFGIMG_STATE_ERASE_WAIT:
 //            break;
 //
@@ -163,11 +191,15 @@ INLINE void ConfigImage::state_machine( void )
 /*                         API                         */
 /*******************************************************/
 
-result_t ConfigImage::init( uint32_t image_address, uint32_t image_size )
+result_t ConfigImage::init( uint32_t image_address_offset, uint32_t image_size )
 {
     /* Save the Image address and size */
-    this->image_address = image_address;
+    this->image_address_offset = image_address_offset;
     this->image_size = image_size;
+
+    /* Flags */
+    flag_is_valid = false;
+    flag_flash_in_progress = false;
 
     /* Load the image */
     flash_image_load();
@@ -201,6 +233,9 @@ result_t ConfigImage::save( const uint8_t * p_data_cache, uint32_t data_cache_le
         ASSERT_DYGMA( false, "ConfigImage data overflow" );
         return RESULT_ERR;
     }
+
+    /* Invalidate the image right here */
+    flag_is_valid = false;
 
     /* Save the cache */
     this->p_data_cache = p_data_cache;

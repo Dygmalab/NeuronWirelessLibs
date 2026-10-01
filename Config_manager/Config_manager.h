@@ -107,10 +107,10 @@ class ConfigManager
         typedef enum
         {
             CONFIG_STATE_IDLE = 1,
-            CONFIG_STATE_ERASE,
-            CONFIG_STATE_ERASE_WAIT,
-            CONFIG_STATE_WRITE,
-            CONFIG_STATE_WRITE_WAIT,
+            CONFIG_STATE_IMAGE_SECONDARY_SAVE,
+            CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT,
+            CONFIG_STATE_IMAGE_PRIMARY_SAVE,
+            CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT,
         } config_state_t;
 
         config_state_t machine_state = CONFIG_STATE_IDLE;
@@ -120,10 +120,8 @@ class ConfigManager
 
         INLINE void machine_state_set( config_state_t state );
         INLINE void machine_state_idle( void );
-        INLINE void machine_state_erase( void );
-        INLINE void machine_state_erase_wait( void );
-        INLINE void machine_state_write( void );
-        INLINE void machine_state_write_wait( void );
+        INLINE void machine_state_image_secondary_save( void );
+
         INLINE void machine( void );
 };
 

@@ -20,8 +20,8 @@
 #include "Config_manager.h"
 #include "kbd_memory.h"
 
-#define FLASH_IMAGE_1_ADDR      0
-#define FLASH_IMAGE_2_ADDR      (FLASH_IMAGE_1_ADDR + FLASH_IMAGE_SIZE)
+#define FLASH_IMAGE_1_ADDR_OFFSET      0
+#define FLASH_IMAGE_2_ADDR_OFFSET      (FLASH_IMAGE_1_ADDR_OFFSET + FLASH_IMAGE_SIZE)
 
 bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t item_size )
 {
@@ -198,10 +198,10 @@ INLINE result_t ConfigManager::images_init( void )
 {
     result_t result = RESULT_ERR;
 
-    result = image_1.init( FLASH_IMAGE_1_ADDR, FLASH_IMAGE_SIZE );
+    result = image_1.init( FLASH_IMAGE_1_ADDR_OFFSET, FLASH_IMAGE_SIZE );
     EXIT_IF_ERR( result, "image_1.init failed" );
 
-    result = image_2.init( FLASH_IMAGE_2_ADDR, FLASH_IMAGE_SIZE );
+    result = image_2.init( FLASH_IMAGE_2_ADDR_OFFSET, FLASH_IMAGE_SIZE );
     EXIT_IF_ERR( result, "image_2.init failed" );
 
     /* Resolve the primary image */
@@ -242,75 +242,28 @@ INLINE void ConfigManager::machine_state_idle( void )
     if( config_save_requested == true && timer_check( &config_save_timer ) == true )
     {
         config_save_requested = false;
-        machine_state_set( CONFIG_STATE_ERASE );
+        machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE );
     }
 }
 
-INLINE void ConfigManager::machine_state_erase( void )
+INLINE void ConfigManager::machine_state_image_secondary_save( void )
 {
     result_t result = RESULT_ERR;
+    uint32_t sequence_num;
 
-    /* Set the EEPROM in progress flag */
-    eeprom_in_progress_flag = true;
+    /* Use the sequence number as +1 to the primary image  */
+    sequence_num = p_image_primary->sequence_num_get() + 1;
 
-    /* Initiate the EEPROM erase process */
-    result = EEPROM.erase();
-    STOP_IF_ERR( result, "EEPROM.erase failed" );
+    result = p_image_secondary->save( cache, sizeof( cache ), sequence_num );
+    ASSERT_DYGMA( result != RESULT_ERR, "p_image_secondary->save failed" );
     EXIT_IF_NOK( result );
 
-    machine_state_set( CONFIG_STATE_ERASE_WAIT );
+    machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT );
 
 _EXIT:
-    if( result != RESULT_OK )
-    {
-        eeprom_in_progress_flag = false;
-    }
-
     return;
 }
 
-INLINE void ConfigManager::machine_state_erase_wait( void )
-{
-    if( eeprom_in_progress_flag == true )
-    {
-        return;
-    }
-
-    machine_state_set( CONFIG_STATE_WRITE );
-}
-
-INLINE void ConfigManager::machine_state_write( void )
-{
-    result_t result = RESULT_ERR;
-
-    /* Set the EEPROM in progress flag */
-    eeprom_in_progress_flag = true;
-
-    /* Initiate the EEPROM write process */
-    result = EEPROM.write( 0, cache, sizeof( cache ) );
-    STOP_IF_ERR( result, "EEPROM.write failed" );
-    EXIT_IF_NOK( result );
-
-    machine_state_set( CONFIG_STATE_WRITE_WAIT );
-
-_EXIT:
-    if( result != RESULT_OK )
-    {
-        eeprom_in_progress_flag = false;
-    }
-
-    return;
-}
-
-INLINE void ConfigManager::machine_state_write_wait( void )
-{
-    if( eeprom_in_progress_flag == true )
-    {
-        return;
-    }
-
-    machine_state_set( CONFIG_STATE_IDLE );
-}
 
 INLINE void ConfigManager::machine( void )
 {
@@ -322,29 +275,12 @@ INLINE void ConfigManager::machine( void )
 
             break;
 
-        case CONFIG_STATE_ERASE:
+        case CONFIG_STATE_IMAGE_SECONDARY_SAVE:
 
-            machine_state_erase();
-
-            break;
-
-        case CONFIG_STATE_ERASE_WAIT:
-
-            machine_state_erase_wait();
+            machine_state_image_secondary_save();
 
             break;
 
-        case CONFIG_STATE_WRITE:
-
-            machine_state_write();
-
-            break;
-
-        case CONFIG_STATE_WRITE_WAIT:
-
-            machine_state_write_wait();
-
-            break;
 
         default:
 

@@ -45,7 +45,7 @@ class ConfigImage
 {
     public:
 
-        result_t init( uint32_t image_address, uint32_t image_size );
+        result_t init( uint32_t image_address_offset, uint32_t image_size );
         bool_t is_valid( void );
         uint32_t sequence_num_get( void );
 
@@ -67,7 +67,7 @@ class ConfigImage
             CFGIMG_STATE_WRITE_CRC_WAIT,
         } cfgimg_state_t;
 
-        uint32_t image_address;
+        uint32_t image_address_offset;
         uint32_t image_size;
 
         cfgimg_state_t state;
@@ -83,6 +83,7 @@ class ConfigImage
 
         /* Flags */
         bool_t flag_is_valid;
+        bool_t flag_flash_in_progress;
 
         INLINE uint32_t crc32_header_calculate( const config_image_header_t * p_header, const uint8_t * p_data, uint32_t data_len );
         INLINE bool_t crc32_header_check( const config_image_header_t * p_header, const uint8_t * p_data, uint32_t data_len );
@@ -92,5 +93,6 @@ class ConfigImage
         INLINE void flash_image_load( void );
 
         INLINE void state_set( cfgimg_state_t cfgimg_state );
+        INLINE void state_erase_process( void );
         INLINE void state_machine( void );
 };
