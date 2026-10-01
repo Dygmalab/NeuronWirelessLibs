@@ -342,7 +342,10 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
         ASSERT_DYGMA(false, "EEPROM available space overflow");
         return RESULT_ERR;
     }
-    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( &fstorage_instance ) == true )
+    /*
+     * nrf_fstorage_is_busy( NULL ) - using NULL to check all fstorage instances over the system
+     */
+    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
     {
         return RESULT_BUSY;
     }
@@ -391,11 +394,26 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
     return RESULT_OK;
 }
 
-result_t EEPROMClass::erase(void)
+result_t EEPROMClass::erase_raw( uint32_t address, uint32_t page_cnt )
 {
-    if( eeprom_busy_flag == true || nrf_fstorage_is_busy( &fstorage_instance ) == true )
+    /*
+     * nrf_fstorage_is_busy( NULL ) - using NULL to check all fstorage instances over the system
+     */
+
+    if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
     {
         return RESULT_BUSY;
+    }
+    else if( address % FLASH_STORAGE_PAGE_SIZE != 0 )
+    {
+        ASSERT_DYGMA(false, "EEPROM invalid erase address (not aligned)");
+        return RESULT_ERR;
+    }
+    else if( address < FLASH_STORAGE_FIRST_PAGE_START_ADDR ||
+         ( ( address - FLASH_STORAGE_FIRST_PAGE_START_ADDR ) / FLASH_STORAGE_PAGE_SIZE ) + page_cnt > FLASH_STORAGE_NUM_PAGES )
+    {
+        ASSERT_DYGMA(false, "EEPROM invalid erase address (out of range)");
+        return RESULT_ERR;
     }
 
 #if FLASH_STORAGE_DEBUG_ERASE_PAGE
@@ -403,10 +421,8 @@ result_t EEPROMClass::erase(void)
     NRF_LOG_FLUSH();
 #endif
     eeprom_busy_flag = true;
-    ret_code_t ret_code = nrf_fstorage_erase(&fstorage_instance,
-                                             FLASH_STORAGE_FIRST_PAGE_START_ADDR,
-                                             FLASH_STORAGE_NUM_PAGES,
-                                             this);
+
+    ret_code_t ret_code = nrf_fstorage_erase( &fstorage_instance, address, page_cnt, this );
     if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Erase error, ret_code = %lu", ret_code);
@@ -438,6 +454,16 @@ result_t EEPROMClass::erase(void)
     */
 
     return RESULT_OK;
+}
+
+result_t EEPROMClass::erase_offset( uint32_t addr_offset, uint32_t page_cnt )
+{
+    return erase_raw( FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, page_cnt );
+}
+
+result_t EEPROMClass::erase_all( void )
+{
+    return erase_raw( FLASH_STORAGE_FIRST_PAGE_START_ADDR, FLASH_STORAGE_NUM_PAGES );
 }
 
 const void * EEPROMClass::data_ptr_get( uint32_t addr_offset )

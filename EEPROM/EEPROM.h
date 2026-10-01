@@ -57,7 +57,10 @@ class EEPROMClass
 
         result_t read( uint32_t addr_offset, uint8_t * p_data, size_t data_size );
         result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
-        result_t erase(void);
+
+        result_t erase_raw( uint32_t address, uint32_t page_cnt );
+        result_t erase_offset( uint32_t addr_offset, uint32_t page_cnt );
+        result_t erase_all( void );
 
         const void * data_ptr_get( uint32_t addr_offset );
 
