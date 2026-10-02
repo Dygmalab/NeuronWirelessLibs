@@ -57,6 +57,10 @@ class ConfigImage
 
         void run( void );
 
+    public:
+
+        static bool_t image_compare( ConfigImage * p_image_1, ConfigImage * p_image_2 );
+
     private:
 
         typedef enum

@@ -592,3 +592,26 @@ void ConfigImage::run( void )
 {
     state_machine();
 }
+
+bool_t ConfigImage::image_compare( ConfigImage * p_image_1, ConfigImage * p_image_2 )
+{
+    const uint8_t * p_data_1;
+    const uint8_t * p_data_2;
+
+    if( p_image_1->flag_is_valid == false || p_image_2->flag_is_valid == false )
+    {
+        return false;
+    }
+    else if( p_image_1->image_size != p_image_2->image_size )
+    {
+        ASSERT_DYGMA( false, "The compared Config Images are not expected to have different sizes" );
+        return false;
+    }
+
+    /* Get the data pointers in the FLASH memory */
+    p_data_1 = ( const uint8_t *)EEPROM.data_ptr_get( p_image_1->image_address_offset );
+    p_data_2 = ( const uint8_t *)EEPROM.data_ptr_get( p_image_2->image_address_offset );
+
+    /* Compare the two memory blocks */
+    return ( memcmp( p_data_1, p_data_2, p_image_1->image_size ) == 0 ) ? true : false;
+}
