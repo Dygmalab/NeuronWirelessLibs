@@ -45,22 +45,20 @@ class EEPROMClass
 
         typedef void (* eeprom_event_cb)( void * p_instance, eeprom_event_type_t event_type );
 
-        typedef struct
-        {
-            /* Event callback */
-            void * p_instance;
-            eeprom_event_cb event_cb;
-        } eeprom_config_t;
+        typedef uint32_t eeprom_lock_t;
 
-        result_t init( const eeprom_config_t * p_config );
-        uint32_t align_get(void);
+        result_t init( void );
+        uint32_t align_get( void );
+
+        result_t reserve( eeprom_lock_t * p_lock, void * p_instance, eeprom_event_cb event_cb );
+        result_t release( eeprom_lock_t lock );
 
         result_t read( uint32_t addr_offset, uint8_t * p_data, size_t data_size );
-        result_t write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
+        result_t write( eeprom_lock_t lock, uint32_t addr_offset, const uint8_t * p_data, size_t data_size );
 
-        result_t erase_raw( uint32_t address, uint32_t page_cnt );
-        result_t erase_offset( uint32_t addr_offset, uint32_t page_cnt );
-        result_t erase_all( void );
+        result_t erase_raw( eeprom_lock_t lock, uint32_t address, uint32_t page_cnt );
+        result_t erase_offset( eeprom_lock_t lock, uint32_t addr_offset, uint32_t page_cnt );
+        result_t erase_all( eeprom_lock_t lock );
 
         const void * data_ptr_get( uint32_t addr_offset );
 
@@ -69,9 +67,13 @@ class EEPROMClass
 
     private:
 
+        /* Reservation */
+        eeprom_lock_t reserve_lock;
+
         /* Flags */
         bool_t initialized_flag = false;
         bool_t eeprom_busy_flag;
+        bool_t is_reserved_flag;
 
         /* Event callback */
         void * p_instance;

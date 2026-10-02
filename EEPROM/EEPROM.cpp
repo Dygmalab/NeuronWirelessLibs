@@ -269,7 +269,7 @@ result_t EEPROMClass::fstorage_init( void )
 /*                           API                            */
 /************************************************************/
 
-result_t EEPROMClass::init( const eeprom_config_t * p_config )
+result_t EEPROMClass::init( void )
 {
     result_t result = RESULT_ERR;
 
@@ -282,12 +282,12 @@ result_t EEPROMClass::init( const eeprom_config_t * p_config )
     result = fstorage_init( );
     EXIT_IF_ERR( result, "fstorage_init failed" );
 
+    /* Reservation */
+    reserve_lock = 0;
+
     /* Set the flags */
     eeprom_busy_flag = false;
-
-    /* Event callback */
-    p_instance = p_config->p_instance;
-    event_cb = p_config->event_cb;
+    is_reserved_flag = false;
 
     /* Set the initialized flag */
     initialized_flag = true;
@@ -296,9 +296,52 @@ _EXIT:
     return result;
 }
 
-uint32_t EEPROMClass::align_get(void)
+uint32_t EEPROMClass::align_get( void )
 {
     return FLASH_STORAGE_ALIGN;
+}
+
+result_t EEPROMClass::reserve( eeprom_lock_t * p_lock, void * p_instance, eeprom_event_cb event_cb )
+{
+    if( is_reserved_flag == true )
+    {
+        /* The EEPROM module is already reserved */
+        return RESULT_ERR;
+    }
+
+    /* Event callback */
+    this->p_instance = p_instance;
+    this->event_cb = event_cb;
+
+    /* Set the reservation lock */
+    reserve_lock = reserve_lock + 1;
+    *p_lock = reserve_lock;
+
+    is_reserved_flag = true;
+
+    return RESULT_OK;
+}
+
+result_t EEPROMClass::release( eeprom_lock_t lock )
+{
+    if( is_reserved_flag == false )
+    {
+        /* The EEPROM module is already released */
+        return RESULT_OK;
+    }
+    else if( lock != reserve_lock )
+    {
+        ASSERT_DYGMA( false, "Trying to release the EEPROM with an invalid lock" );
+        return RESULT_ERR;
+    }
+
+    /* Event callback */
+    this->p_instance = NULL;
+    this->event_cb = NULL;
+
+    is_reserved_flag = false;
+
+    return RESULT_OK;
 }
 
 result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_size )
@@ -330,9 +373,14 @@ result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_
     return RESULT_OK;
 }
 
-result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size )
+result_t EEPROMClass::write( eeprom_lock_t lock, uint32_t addr_offset, const uint8_t * p_data, size_t data_size )
 {
-    if (data_size == 0)
+    if( is_reserved_flag == false || lock != reserve_lock )
+    {
+        ASSERT_DYGMA( false, "The caller of the function has not reserved the EEPROM module" );
+        return RESULT_ERR;
+    }
+    else if (data_size == 0)
     {
         /* Nothing to write */
         return RESULT_OK;
@@ -394,13 +442,17 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
     return RESULT_OK;
 }
 
-result_t EEPROMClass::erase_raw( uint32_t address, uint32_t page_cnt )
+result_t EEPROMClass::erase_raw( eeprom_lock_t lock, uint32_t address, uint32_t page_cnt )
 {
+    if( is_reserved_flag == false || lock != reserve_lock )
+    {
+        ASSERT_DYGMA( false, "The caller of the function has not reserved the EEPROM module" );
+        return RESULT_ERR;
+    }
     /*
      * nrf_fstorage_is_busy( NULL ) - using NULL to check all fstorage instances over the system
      */
-
-    if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
+    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
     {
         return RESULT_BUSY;
     }
@@ -456,14 +508,14 @@ result_t EEPROMClass::erase_raw( uint32_t address, uint32_t page_cnt )
     return RESULT_OK;
 }
 
-result_t EEPROMClass::erase_offset( uint32_t addr_offset, uint32_t page_cnt )
+result_t EEPROMClass::erase_offset( eeprom_lock_t lock, uint32_t addr_offset, uint32_t page_cnt )
 {
-    return erase_raw( FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, page_cnt );
+    return erase_raw( lock, FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, page_cnt );
 }
 
-result_t EEPROMClass::erase_all( void )
+result_t EEPROMClass::erase_all( eeprom_lock_t lock )
 {
-    return erase_raw( FLASH_STORAGE_FIRST_PAGE_START_ADDR, FLASH_STORAGE_NUM_PAGES );
+    return erase_raw( lock, FLASH_STORAGE_FIRST_PAGE_START_ADDR, FLASH_STORAGE_NUM_PAGES );
 }
 
 const void * EEPROMClass::data_ptr_get( uint32_t addr_offset )
