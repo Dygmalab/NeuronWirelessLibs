@@ -68,20 +68,6 @@ class ConfigManager
         static result_t kbdmem_ll_data_save_cb( void * p_instance, const void * p_mem_target, const void * p_data, uint16_t data_len );
 
         /********************************************/
-        /*                 EEPROM                   */
-        /********************************************/
-
-    private:
-
-        bool_t eeprom_in_progress_flag = false;
-
-        INLINE result_t eeprom_init( void );
-        INLINE void eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type );
-
-        static void eeprom_event_cb( void * p_instance, EEPROMClass::eeprom_event_type_t event_type );
-
-
-        /********************************************/
         /*              Config Images               */
         /********************************************/
 
@@ -94,6 +80,7 @@ class ConfigManager
         ConfigImage * p_image_secondary;
 
         INLINE result_t images_init( void );
+        INLINE void images_save_start( void );
         INLINE void images_run( void );
 
         /****************************************************/
@@ -107,10 +94,12 @@ class ConfigManager
         typedef enum
         {
             CONFIG_STATE_IDLE = 1,
+            CONFIG_STATE_SAVE_START,
             CONFIG_STATE_IMAGE_SECONDARY_SAVE,
             CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT,
             CONFIG_STATE_IMAGE_PRIMARY_SAVE,
             CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT,
+            CONFIG_STATE_SAVE_FINISH,
         } config_state_t;
 
         config_state_t machine_state = CONFIG_STATE_IDLE;
@@ -120,7 +109,12 @@ class ConfigManager
 
         INLINE void machine_state_set( config_state_t state );
         INLINE void machine_state_idle( void );
+        INLINE void machine_state_save_start( void );
         INLINE void machine_state_image_secondary_save( void );
+        INLINE void machine_state_image_secondary_save_wait( void );
+        INLINE void machine_state_image_primary_save( void );
+        INLINE void machine_state_image_primary_save_wait( void );
+        INLINE void machine_state_save_finish( void );
 
         INLINE void machine( void );
 };

@@ -23,6 +23,16 @@
 #define FLASH_IMAGE_1_ADDR_OFFSET      0
 #define FLASH_IMAGE_2_ADDR_OFFSET      (FLASH_IMAGE_1_ADDR_OFFSET + FLASH_IMAGE_SIZE)
 
+/******************************************************/
+/*                 External Functions                 */
+/******************************************************/
+
+extern void reset_mcu(void);
+
+/******************************************************/
+/*                 Configuration Items                */
+/******************************************************/
+
 bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t item_size )
 {
     /* Check the target is within the config space */
@@ -140,57 +150,6 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
 }
 
 /********************************************/
-/*                 EEPROM                   */
-/********************************************/
-
-INLINE void ConfigManager::eeprom_event_handler( EEPROMClass::eeprom_event_type_t event_type )
-{
-    mcu_sleep_postpone();
-
-    switch( event_type )
-    {
-        case EEPROMClass::EEPROM_EVENT_TYPE_WRITE_FINISHED:
-
-            eeprom_in_progress_flag = false;
-
-            break;
-
-        case EEPROMClass::EEPROM_EVENT_TYPE_ERASE_FINISHED:
-
-            eeprom_in_progress_flag = false;
-
-            break;
-
-        default:
-
-            ASSERT_DYGMA( false, "Unhandled EEPROM event type" );
-
-            break;
-    }
-}
-
-void ConfigManager::eeprom_event_cb( void * p_instance, EEPROMClass::eeprom_event_type_t event_type )
-{
-    ConfigManager * p_config_manager = ( ConfigManager *)p_instance;
-    p_config_manager->eeprom_event_handler( event_type );
-}
-
-INLINE result_t ConfigManager::eeprom_init( void )
-{
-    result_t result = RESULT_ERR;
-    EEPROMClass::eeprom_config_t config;
-
-    config.p_instance = this;
-    config.event_cb = eeprom_event_cb;
-
-    result = EEPROM.init( &config );
-    EXIT_IF_ERR( result, "EEPROM.init failed" );
-
-_EXIT:
-    return result;
-}
-
-/********************************************/
 /*              Config Images               */
 /********************************************/
 
@@ -241,9 +200,17 @@ INLINE void ConfigManager::machine_state_idle( void )
 {
     if( config_save_requested == true && timer_check( &config_save_timer ) == true )
     {
-        config_save_requested = false;
-        machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE );
+        machine_state_set( CONFIG_STATE_SAVE_START );
     }
+}
+
+INLINE void ConfigManager::machine_state_save_start( void )
+{
+    /* Clear the configuration request flag */
+    config_save_requested = false;
+
+    /* We start with the secondary image, which has been previously recognized as the older one */
+    machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE );
 }
 
 INLINE void ConfigManager::machine_state_image_secondary_save( void )
@@ -264,6 +231,82 @@ _EXIT:
     return;
 }
 
+INLINE void ConfigManager::machine_state_image_secondary_save_wait( void )
+{
+    if( p_image_secondary->is_busy() == true )
+    {
+        return;
+    }
+    else if( p_image_secondary->is_valid() == false )
+    {
+        ASSERT_DYGMA( false, "Config secondary image is not expected to be invalid after the save process finish." );
+
+        /* The image write is really not expected to end up with an invalid image in the memory. Instead of risking the
+         * primary image fails too, we reset the mcu here to preserve the primary image and, hopefully, resolve any
+         * unknown background causes of this issue. */
+        reset_mcu();
+
+        return;
+    }
+
+    /* The secondary image write was successful - move to the primary image save */
+    machine_state_set( CONFIG_STATE_IMAGE_PRIMARY_SAVE );
+}
+
+INLINE void ConfigManager::machine_state_image_primary_save( void )
+{
+    result_t result = RESULT_ERR;
+    uint32_t sequence_num;
+
+    /* Use the sequence number as +1 to the primary image  */
+    sequence_num = p_image_primary->sequence_num_get() + 1;
+
+    result = p_image_primary->save( cache, sizeof( cache ), sequence_num );
+    ASSERT_DYGMA( result != RESULT_ERR, "p_image_primary->save failed" );
+    EXIT_IF_NOK( result );
+
+    machine_state_set( CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT );
+
+_EXIT:
+    return;
+}
+
+INLINE void ConfigManager::machine_state_image_primary_save_wait( void )
+{
+    if( p_image_primary->is_busy() == true )
+    {
+        return;
+    }
+    else if( p_image_primary->is_valid() == false )
+    {
+        ASSERT_DYGMA( false, "Config primary image is not expected to be invalid after the save process finish." );
+
+        /* The image write is really not expected to end up with an invalid image in the memory. As the primary image
+         * is now invalid, we reset the mcu here to preserve the secondary image and, hopefully, resolve any
+         * unknown background causes of this issue. */
+        reset_mcu();
+
+        return;
+    }
+
+    /* The primary image write was successful - move to the save finish state */
+    machine_state_set( CONFIG_STATE_SAVE_FINISH );
+}
+
+INLINE void ConfigManager::machine_state_save_finish( void )
+{
+    /* Check the Primary and Secondary are same */
+    if( ConfigImage::image_compare( p_image_primary, p_image_secondary ) == false )
+    {
+        /* The primary and secondary images are not consistent, restart the images save process */
+        machine_state_set( CONFIG_STATE_SAVE_START );
+
+        return;
+    }
+
+    /* The configuration save is successful */
+    machine_state_set( CONFIG_STATE_IDLE );
+}
 
 INLINE void ConfigManager::machine( void )
 {
@@ -275,12 +318,41 @@ INLINE void ConfigManager::machine( void )
 
             break;
 
+        case CONFIG_STATE_SAVE_START:
+
+            machine_state_save_start();
+
+            break;
+
         case CONFIG_STATE_IMAGE_SECONDARY_SAVE:
 
             machine_state_image_secondary_save();
 
             break;
 
+        case CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT:
+
+            machine_state_image_secondary_save_wait();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_PRIMARY_SAVE:
+
+            machine_state_image_primary_save();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT:
+
+            machine_state_image_primary_save_wait();
+
+            break;
+
+        case CONFIG_STATE_SAVE_FINISH:
+
+            machine_state_save_finish();
+
+            break;
 
         default:
 
@@ -302,8 +374,8 @@ result_t ConfigManager::init( void )
     p_cache_pointer = cache;
 
     /* Initialize the EEPROM */
-    result = eeprom_init();
-    EXIT_IF_ERR( result, "eeprom_init failed" );
+    result = EEPROM.init();
+    EXIT_IF_ERR( result, "EEPROM.init failed" );
 
     /* Initialize the configuration images */
     result = images_init();
