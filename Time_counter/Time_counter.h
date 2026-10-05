@@ -54,6 +54,11 @@ bool timer_check( dl_timer_t * p_timer );
 
 void timer_delay_ms( uint32_t timeout_ms );
 
+void timer_measure_start( systim_tick_t * p_meas_ticks_start );
+systim_tick_t timer_measure_stop( systim_tick_t meas_ticks_start );
+uint64_t timer_measure_stop_us( systim_tick_t meas_ticks_start );
+uint64_t timer_measure_stop_ms( systim_tick_t meas_ticks_start );
+
 #ifdef __cplusplus
 }
 #endif

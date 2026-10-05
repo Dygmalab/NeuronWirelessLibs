@@ -355,3 +355,52 @@ void timer_delay_ms( uint32_t timeout_ms )
         mcu_sleep_control( );
     }
 }
+
+
+/************ Measuring ************/
+void timer_measure_start( systim_tick_t * p_meas_ticks_start )
+{
+    _systim_ticks_update( );
+
+    //stop interrupts
+    _interrupt_disable( );
+
+    //compute the target threshold value in number of ticks
+    *p_meas_ticks_start = systim_ticks;
+
+    //resume interrupts
+    _interrupt_enable( );
+}
+
+systim_tick_t timer_measure_stop( systim_tick_t meas_ticks_start )
+{
+
+    systim_tick_t meas_ticks_result;
+
+    _systim_ticks_update( );
+
+    //stop interrupts
+    _interrupt_disable( );
+
+    //compute the target threshold value in number of ticks
+    meas_ticks_result = systim_ticks - meas_ticks_start;
+
+    //resume interrupts
+    _interrupt_enable( );
+
+    return meas_ticks_result;
+}
+
+uint64_t timer_measure_stop_us( systim_tick_t meas_ticks_start )
+{
+    systim_tick_t meas_ticks = timer_measure_stop( meas_ticks_start );
+
+    return SYSTIM_TICK_CNT_TO_US( meas_ticks );
+}
+
+uint64_t timer_measure_stop_ms( systim_tick_t meas_ticks_start )
+{
+    systim_tick_t meas_ticks = timer_measure_stop( meas_ticks_start );
+
+    return SYSTIM_TICK_CNT_TO_MS( meas_ticks );
+}
