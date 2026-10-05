@@ -21,6 +21,7 @@
 
 #include "Ble_composite_dev.h"
 #include "ble_types.h"
+#include "fds.h"
 
 
 #define BLECFG_CHANNELS_COUNT                   5
@@ -113,13 +114,13 @@ class BleConfig
 
     private:
 
-        typedef struct PACK
-        {
-//            channel_t channels[BLE_CHANNELS_COUNT];
-            ble_device_name_t device_name_local;    /* The local BLE device name */
-            uint8_t current_channel_id;             /* The ID of the currently selected channel */
-            bool_t force_ble;
-        } ble_config_t;
+//        typedef struct PACK
+//        {
+////            channel_t channels[BLE_CHANNELS_COUNT];
+////            ble_device_name_t device_name_local;    /* The local BLE device name */
+////            uint8_t current_channel_id;             /* The ID of the currently selected channel */
+////            bool_t force_ble;
+//        } ble_config_t;
 
         typedef struct PACK
         {
@@ -143,7 +144,7 @@ class BleConfig
             BLECFG_STATE_PEER_ERASE_WAIT,
         } blecfg_state_t;
 
-        const ble_config_t * p_ble_config = nullptr;
+//        const ble_config_t * p_ble_config = nullptr;
 
         blecfg_state_t cfg_state;
 
@@ -202,6 +203,60 @@ class BleConfig
 
 //        void cfgmem_channel_reset( const channel_t * p_channel, uint8_t id );
         void cfgmem_config_reset();
+
+    private:
+
+#define BLEFDS_CONFIG_VERSION       1
+
+        typedef struct PACK __attribute__((aligned(4)))
+        {
+            uint32_t version;
+            uint8_t current_channel_id;             /* The ID of the currently selected channel */
+            bool_t force_ble;
+        } blefds_config_t;
+
+        typedef enum
+        {
+            BLEFDS_STATE_IDLE = 1,
+            BLEFDS_STATE_INIT,
+            BLEFDS_STATE_INIT_WAIT,
+            BLEFDS_STATE_CONFIG_LOAD,
+            BLEFDS_STATE_CONFIG_WRITE,
+            BLEFDS_STATE_CONFIG_WRITE_WAIT,
+        } blefds_state_t;
+
+        blefds_config_t blefds_config;
+
+        blefds_state_t blefds_state;
+
+        /* Flags */
+        bool_t blefds_flag_initializing;
+        bool_t blefds_flag_write_req;
+        bool_t blefds_flag_writing;
+
+        /* FDS */
+        blefds_config_t fds_write_buffer;
+        fds_record_desc_t fds_write_desc;
+
+        result_t blefds_init( void );
+
+        void blefds_config_load_default( void );
+        result_t blefds_config_load( void );
+        result_t blefds_config_write( void );
+
+        void blefds_state_set( blefds_state_t fds_state );
+        void blefds_state_idle( void );
+        void blefds_state_init( void );
+        void blefds_state_init_wait( void );
+        void blefds_state_config_load( void );
+        void blefds_state_config_write( void );
+        void blefds_state_config_write_wait( void );
+        void blefds_state_machine( void );
+
+        void fds_evt_init_process( fds_evt_t const * p_evt );
+        void fds_evt_write_process( fds_evt_t const * p_evt );
+        void fds_event_process( fds_evt_t const * p_evt );
+        static void fds_event_cb( fds_evt_t const * p_evt );
 };
 
 extern class BleConfig BleConfig;

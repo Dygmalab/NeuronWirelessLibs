@@ -18,6 +18,13 @@
 #include "Ble_config.h"
 #include "Config_manager.h"
 
+#define BLEFDS_FILE_ID     0x1000
+#define BLEFDS_RECORD_KEY  0x1000
+
+/* nRF-level EXIT macro */
+#define EXIT_IF_ERR_NRF( nrf_err, err, msg ) do{ err = ( nrf_err != NRF_SUCCESS ) ? RESULT_ERR : RESULT_OK; \
+                                                 EXIT_IF_ERR( err, msg ); } while(0);
+
 static const ble_device_name_t ble_device_name_local = { BLE_DEVICE_NAME };
 
 /****************************************************/
@@ -620,6 +627,323 @@ inline void BleConfig::cfg_state_machine( void )
 }
 
 /****************************************************/
+/*                        FDS                       */
+/****************************************************/
+
+void BleConfig::fds_evt_init_process( fds_evt_t const * p_evt )
+{
+    blefds_flag_initializing = false;
+}
+
+void BleConfig::fds_evt_write_process( fds_evt_t const * p_evt )
+{
+    if( p_evt->write.file_id != BLEFDS_FILE_ID || p_evt->write.record_key != BLEFDS_RECORD_KEY )
+    {
+        return;
+    }
+
+    blefds_flag_writing = false;
+}
+
+void BleConfig::fds_event_process( fds_evt_t const * p_evt )
+{
+    mcu_sleep_postpone();
+
+    switch( p_evt->id )
+    {
+        case FDS_EVT_INIT:
+
+            fds_evt_init_process( p_evt);
+
+            break;
+
+        case FDS_EVT_WRITE:
+        case FDS_EVT_UPDATE:
+
+            fds_evt_write_process( p_evt);
+
+            break;
+
+//        case FDS_EVT_DEL_RECORD:
+//            break;
+//
+//        case FDS_EVT_DEL_FILE:
+//            break;
+//
+//        case FDS_EVT_GC:
+//            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled BLECFG FDS event" );
+
+            break;
+    }
+}
+
+void BleConfig::fds_event_cb( fds_evt_t const * p_evt )
+{
+    ::BleConfig.fds_event_process( p_evt );
+}
+
+result_t BleConfig::blefds_init( void )
+{
+    ret_code_t err_code;
+    result_t result = RESULT_ERR;
+
+    /* Po inicializaci SoftDevice, před pm_init(). */
+    err_code = fds_register( fds_event_cb );
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_register failed" );
+    EXIT_IF_ERR_NRF( err_code, result, "fds_register failed" );
+
+    /* Flags */
+    blefds_flag_initializing = false;
+    blefds_flag_write_req = false;
+    blefds_flag_writing = false;
+
+    blefds_state_set( BLEFDS_STATE_INIT );
+
+_EXIT:
+    return result;
+}
+
+void BleConfig::blefds_config_load_default( void )
+{
+    blefds_config.version = BLEFDS_CONFIG_VERSION;
+//    blefds_config.device_name_local = ble_device_name_local;
+    blefds_config.current_channel_id = 0;
+    blefds_config.force_ble = false;
+}
+
+result_t BleConfig::blefds_config_load( void )
+{
+    ret_code_t err_code;
+    result_t result = RESULT_ERR;
+
+    fds_record_desc_t desc = {0};
+    fds_find_token_t token = {0};
+    fds_flash_record_t record;
+
+    err_code = fds_record_find( BLEFDS_FILE_ID, BLEFDS_RECORD_KEY, &desc, &token );
+    EXIT_IF_ERR_NRF( err_code, result, "fds_record_find failed" );
+
+    err_code = fds_record_open( &desc, &record );
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_record_open failed" );
+    EXIT_IF_ERR_NRF( err_code, result, "fds_record_open failed" );
+
+    if ( record.p_header->length_words * 4u != sizeof( blefds_config ) )
+    {
+        /* The size of the fds record is not consistent */
+        result = RESULT_ERR;
+        goto _RECORD_CLOSE;
+    }
+
+    /* Load the configuration */
+    memcpy( &blefds_config, record.p_data, sizeof( blefds_config ) );
+
+    if( blefds_config.version != BLEFDS_CONFIG_VERSION )
+    {
+        /* The version of the fds record is not consistent */
+        result = RESULT_ERR;
+        goto _RECORD_CLOSE;
+    }
+
+_RECORD_CLOSE:
+
+    err_code = fds_record_close( &desc );
+    if( err_code != NRF_SUCCESS )
+    {
+        ASSERT_DYGMA( false, "fds_record_close failed" );
+        return RESULT_ERR;
+    }
+
+_EXIT:
+    return result;
+}
+
+result_t BleConfig::blefds_config_write( void )
+{
+    ret_code_t err_code;
+    result_t result = RESULT_ERR;
+
+    /* Move data to the FDS write buffer */
+    fds_write_buffer = blefds_config;
+
+    fds_record_t record = {0};
+    record.file_id = BLEFDS_FILE_ID;
+    record.key = BLEFDS_RECORD_KEY;
+    record.data.p_data = &fds_write_buffer;
+    record.data.length_words = sizeof(fds_write_buffer) / 4;
+
+    fds_find_token_t token = {0};
+
+    err_code = fds_record_find( BLEFDS_FILE_ID, BLEFDS_RECORD_KEY, &fds_write_desc, &token );
+
+    if ( err_code == NRF_SUCCESS )
+    {
+        err_code = fds_record_update( &fds_write_desc, &record );
+        ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_record_update failed" );
+        EXIT_IF_ERR_NRF( err_code, result, "fds_record_update failed" );
+    }
+    else if (err_code == FDS_ERR_NOT_FOUND)
+    {
+        err_code = fds_record_write( &fds_write_desc, &record );
+        ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_record_write failed" );
+        EXIT_IF_ERR_NRF( err_code, result, "fds_record_write failed" );
+    }
+    else
+    {
+        ASSERT_DYGMA( false, "fds_record_find failed" );
+        EXIT_IF_ERR_NRF( err_code, result, "fds_record_find failed" );
+    }
+
+_EXIT:
+    return result;
+}
+
+void BleConfig::blefds_state_set( blefds_state_t blefds_state )
+{
+    this->blefds_state = blefds_state;
+    mcu_sleep_postpone();
+}
+
+void BleConfig::blefds_state_idle( void )
+{
+    if( blefds_flag_write_req == true )
+    {
+        blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
+    }
+}
+
+void BleConfig::blefds_state_init( void )
+{
+    ret_code_t err_code;
+
+    blefds_flag_initializing = true;
+
+    err_code = fds_init();
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_init failed" );
+
+    blefds_state_set( BLEFDS_STATE_INIT_WAIT );
+
+    UNUSED( err_code );
+}
+
+void BleConfig::blefds_state_init_wait( void )
+{
+    if( blefds_flag_initializing == true )
+    {
+        return;
+    }
+
+    blefds_state_set( BLEFDS_STATE_CONFIG_LOAD );
+}
+
+void BleConfig::blefds_state_config_load( void )
+{
+    result_t result = RESULT_ERR;
+
+    /* Try to load the configuration */
+    result = blefds_config_load();
+
+    if( result == RESULT_OK )
+    {
+        /* The FDS configuration has been loaded successfully - move to the IDLE state */
+        blefds_state_set( BLEFDS_STATE_IDLE );
+        return;
+    }
+
+    /* The FDS config has not been loaded from the FDS memory - load default */
+    blefds_config_load_default();
+
+    /* Write the default BLE FDS config to the memory */
+    blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
+}
+
+void BleConfig::blefds_state_config_write( void )
+{
+    result_t result = RESULT_ERR;
+
+    blefds_flag_writing = true;
+
+    /* Try to load the configuration */
+    result = blefds_config_write();
+    EXIT_IF_ERR( result, "blefds_config_write failed" );
+
+    /* The write is in progress - clear the write request flag */
+    blefds_flag_write_req = false;
+
+    blefds_state_set( BLEFDS_STATE_CONFIG_WRITE_WAIT );
+
+_EXIT:
+    if( result != RESULT_OK )
+    {
+        blefds_flag_writing = false;
+    }
+
+    return;
+}
+
+void BleConfig::blefds_state_config_write_wait( void )
+{
+    if( blefds_flag_writing == true )
+    {
+        return;
+    }
+
+    /* The FDS config is written - return to the Idle state */
+    blefds_state_set( BLEFDS_STATE_IDLE );
+}
+
+void BleConfig::blefds_state_machine( void )
+{
+    switch( blefds_state )
+    {
+        case BLEFDS_STATE_IDLE:
+
+            blefds_state_idle();
+
+            break;
+
+        case BLEFDS_STATE_INIT:
+
+            blefds_state_init();
+
+            break;
+
+        case BLEFDS_STATE_INIT_WAIT:
+
+            blefds_state_init_wait();
+
+            break;
+
+        case BLEFDS_STATE_CONFIG_LOAD:
+
+            blefds_state_config_load();
+
+            break;
+
+        case BLEFDS_STATE_CONFIG_WRITE:
+
+            blefds_state_config_write();
+
+            break;
+
+        case BLEFDS_STATE_CONFIG_WRITE_WAIT:
+
+            blefds_state_config_write_wait();
+
+            break;
+
+        default:
+
+            ASSERT_DYGMA( false, "Unhandled BLEFDS state" )
+
+            break;
+    }
+}
+
+/****************************************************/
 /*                   Config Memory                  */
 /****************************************************/
 
@@ -675,30 +999,30 @@ void BleConfig::cfgmem_ble_name_save( const ble_device_name_t * p_name_config, c
 //    cfgmem_ble_name_save( &p_channel->device_name, p_device_name );
 //}
 
-void BleConfig::cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local )
-{
-    cfgmem_ble_name_save( &p_ble_config->device_name_local, p_device_name_local );
-}
+//void BleConfig::cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local )
+//{
+//    cfgmem_ble_name_save( &p_ble_config->device_name_local, p_device_name_local );
+//}
 
-void BleConfig::cfgmem_current_channel_id_save( uint8_t channel_id )
-{
-    result_t result = RESULT_ERR;
+//void BleConfig::cfgmem_current_channel_id_save( uint8_t channel_id )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_ble_config->current_channel_id, &channel_id, sizeof( p_ble_config->current_channel_id) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
 
-    result = ConfigManager.config_item_update( &p_ble_config->current_channel_id, &channel_id, sizeof( p_ble_config->current_channel_id) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
-
-void BleConfig::cfgmem_force_ble_save( bool_t force_ble )
-{
-    result_t result = RESULT_ERR;
-
-    result = ConfigManager.config_item_update( &p_ble_config->force_ble, &force_ble, sizeof( p_ble_config->force_ble) );
-    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
-
-    UNUSED( result );
-}
+//void BleConfig::cfgmem_force_ble_save( bool_t force_ble )
+//{
+//    result_t result = RESULT_ERR;
+//
+//    result = ConfigManager.config_item_update( &p_ble_config->force_ble, &force_ble, sizeof( p_ble_config->force_ble) );
+//    ASSERT_DYGMA( result == RESULT_OK, "ConfigManager.config_item_update failed" );
+//
+//    UNUSED( result );
+//}
 
 //void BleConfig::cfgmem_channel_reset( const channel_t * p_channel, uint8_t id )
 //{
@@ -714,18 +1038,18 @@ void BleConfig::cfgmem_force_ble_save( bool_t force_ble )
 //    cfgmem_channel_device_name_save( p_channel, &default_device_name );
 //}
 
-void BleConfig::cfgmem_config_reset()
-{
-//    uint8_t i;
-//    for( i = 0; i < BLE_CHANNELS_COUNT; i++)
-//    {
-//        cfgmem_channel_reset( &p_ble_config->channels[i], i );
-//    }
-
-    cfgmem_device_name_local_save( &ble_device_name_local );
-    cfgmem_current_channel_id_save( 0 );
-//    cfgmem_force_ble_save( false );
-}
+//void BleConfig::cfgmem_config_reset()
+//{
+////    uint8_t i;
+////    for( i = 0; i < BLE_CHANNELS_COUNT; i++)
+////    {
+////        cfgmem_channel_reset( &p_ble_config->channels[i], i );
+////    }
+//
+//    cfgmem_device_name_local_save( &ble_device_name_local );
+//    cfgmem_current_channel_id_save( 0 );
+////    cfgmem_force_ble_save( false );
+//}
 
 /****************************************************/
 /*                        API                       */
@@ -735,15 +1059,19 @@ result_t BleConfig::cfg_init( const blecfg_config_t * p_config )
 {
     result_t result = RESULT_ERR;
 
-    /* First, get the current BLE configuration */
-    result = ConfigManager.config_item_request( (const void **)&p_ble_config, sizeof( ble_config_t ) );
-    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
+//    /* First, get the current BLE configuration */
+//    result = ConfigManager.config_item_request( (const void **)&p_ble_config, sizeof( ble_config_t ) );
+//    EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
-    // For now lest think that if this variable is invalid, restart everything.
-    if( p_ble_config->current_channel_id == 0xFF )
-    {
-        cfgmem_config_reset();
-    }
+//    // For now lest think that if this variable is invalid, restart everything.
+//    if( p_ble_config->current_channel_id == 0xFF )
+//    {
+//        cfgmem_config_reset();
+//    }
+
+    /* Initialize the FDS */
+    result = blefds_init();
+    EXIT_IF_ERR( result, "blefds_init failed" );
 
     /* Prepare the config channels */
     result = cfg_channels_init();
@@ -808,31 +1136,53 @@ bool BleConfig::cfg_is_busy( void )
     {
         return true;
     }
-    else if( cfg_state == BLECFG_STATE_DISABLED || cfg_state == BLECFG_STATE_ENABLED )
+    else if( cfg_state != BLECFG_STATE_DISABLED && cfg_state != BLECFG_STATE_ENABLED )
     {
-        return false;
+        return true;
+    }
+    else if( blefds_state != BLEFDS_STATE_IDLE || blefds_flag_write_req == true )
+    {
+        return true;
     }
     else
     {
-        return true;
+        return false;
     }
 }
 
 const ble_device_name_t * BleConfig::cfg_ble_device_name_local_get( void )
 {
-    return &p_ble_config->device_name_local;
+    return &ble_device_name_local;
 }
+
+//void BleConfig::cfg_current_channel_set( uint8_t channel_id )
+//{
+//    ASSERT_DYGMA( channel_id < BLECFG_CHANNELS_COUNT, "BLE Config trying to save invalid channel id" );
+//
+//    cfgmem_current_channel_id_save( channel_id );
+//}
 
 void BleConfig::cfg_current_channel_set( uint8_t channel_id )
 {
     ASSERT_DYGMA( channel_id < BLECFG_CHANNELS_COUNT, "BLE Config trying to save invalid channel id" );
 
-    cfgmem_current_channel_id_save( channel_id );
+    if( blefds_config.current_channel_id == channel_id )
+    {
+        return;
+    }
+
+    /* Set the new channel_id */
+    blefds_config.current_channel_id = channel_id;
+
+    /* Request the BLE FDS config write */
+    blefds_flag_write_req = true;
 }
 
 const BleConfig::blecfg_channel_t * BleConfig::cfg_current_channel_get( void )
 {
-    return &cfg_channels[ p_ble_config->current_channel_id ];
+    ASSERT_DYGMA( blefds_config.version == BLEFDS_CONFIG_VERSION, "blefds_config has not been loaded yet" );
+
+    return &cfg_channels[ blefds_config.current_channel_id ];
 }
 
 result_t BleConfig::cfg_channel_bond_save( const blecfg_channel_t * p_blecfg_channel )
@@ -879,17 +1229,27 @@ _EXIT:
 
 void BleConfig::cfg_force_ble_set( bool enabled )
 {
-    cfgmem_force_ble_save( enabled );
+    if( blefds_config.force_ble == enabled )
+    {
+        return;
+    }
+
+    /* Set the new force_ble state */
+    blefds_config.force_ble = enabled;
+
+    /* Request the BLE FDS config write */
+    blefds_flag_write_req = true;
 }
 
 bool BleConfig::cfg_force_ble_get( void )
 {
-    return p_ble_config->force_ble;
+    return blefds_config.force_ble;
 }
 
 void BleConfig::cfg_run( void )
 {
     cfg_state_machine();
+    blefds_state_machine();
 }
 
 class BleConfig BleConfig;
