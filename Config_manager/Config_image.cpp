@@ -346,16 +346,23 @@ INLINE void ConfigImage::state_write_data_wait_process( void )
         return;
     }
 
-    /* Check the data is stored correctly */
-    if( memcmp( p_flash_data, p_data_cache, data_cache_len ) != 0 )
-    {
-        ASSERT_DYGMA( false, "Config image data write failed" );
+    /*
+     * We intentionally do not compare the stored cache here. The consistency check is made as the last step in the Config manager:
+     *
+     * Explanation: The the p_data_cache may be changed mid-save process. This is a trade-off for currently not using a dedicated
+     *              cache space and thus saving half of the RAM otherwise needed for the Config memory processing.
+     */
 
-        /* The data has not been saved correctly - Retry the save process */
-        flash_image_save_retry();
-
-        return;
-    }
+//    /* Check the data is stored correctly */
+//    if( memcmp( p_flash_data, p_data_cache, data_cache_len ) != 0 )
+//    {
+//        ASSERT_DYGMA( false, "Config image data write failed" );
+//
+//        /* The data has not been saved correctly - Retry the save process */
+//        flash_image_save_retry();
+//
+//        return;
+//    }
 
     /* Move on to the CRC write */
     state_write_crc_set( );
