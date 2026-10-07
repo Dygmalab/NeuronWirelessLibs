@@ -238,24 +238,25 @@ class BleConfig
         blefds_config_t fds_write_buffer;
         fds_record_desc_t fds_write_desc;
 
-        result_t blefds_init( void );
+        inline result_t blefds_init( void );
 
-        void blefds_config_load_default( void );
-        result_t blefds_config_load( void );
-        result_t blefds_config_write( void );
+        inline void blefds_config_load_default( void );
+        inline result_t blefds_config_load( void );
+        inline result_t blefds_config_write( void );
 
-        void blefds_state_set( blefds_state_t fds_state );
-        void blefds_state_idle( void );
-        void blefds_state_init( void );
-        void blefds_state_init_wait( void );
-        void blefds_state_config_load( void );
-        void blefds_state_config_write( void );
-        void blefds_state_config_write_wait( void );
-        void blefds_state_machine( void );
+        inline void blefds_state_set( blefds_state_t fds_state );
+        inline void blefds_state_idle( void );
+        inline void blefds_state_init( void );
+        inline void blefds_state_init_wait( void );
+        inline void blefds_state_config_load( void );
+        inline void blefds_state_config_write( void );
+        inline void blefds_state_config_write_wait( void );
+        inline void blefds_state_machine( void );
 
-        void fds_evt_init_process( fds_evt_t const * p_evt );
-        void fds_evt_write_process( fds_evt_t const * p_evt );
-        void fds_event_process( fds_evt_t const * p_evt );
+        inline void fds_evt_init_process( fds_evt_t const * p_evt );
+        inline void fds_evt_write_process( fds_evt_t const * p_evt );
+        inline void fds_event_process( fds_evt_t const * p_evt );
+
         static void fds_event_cb( fds_evt_t const * p_evt );
 };
 

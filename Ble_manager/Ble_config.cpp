@@ -630,12 +630,12 @@ inline void BleConfig::cfg_state_machine( void )
 /*                        FDS                       */
 /****************************************************/
 
-void BleConfig::fds_evt_init_process( fds_evt_t const * p_evt )
+inline void BleConfig::fds_evt_init_process( fds_evt_t const * p_evt )
 {
     blefds_flag_initializing = false;
 }
 
-void BleConfig::fds_evt_write_process( fds_evt_t const * p_evt )
+inline void BleConfig::fds_evt_write_process( fds_evt_t const * p_evt )
 {
     if( p_evt->write.file_id != BLEFDS_FILE_ID || p_evt->write.record_key != BLEFDS_RECORD_KEY )
     {
@@ -645,7 +645,7 @@ void BleConfig::fds_evt_write_process( fds_evt_t const * p_evt )
     blefds_flag_writing = false;
 }
 
-void BleConfig::fds_event_process( fds_evt_t const * p_evt )
+inline void BleConfig::fds_event_process( fds_evt_t const * p_evt )
 {
     mcu_sleep_postpone();
 
@@ -686,7 +686,7 @@ void BleConfig::fds_event_cb( fds_evt_t const * p_evt )
     ::BleConfig.fds_event_process( p_evt );
 }
 
-result_t BleConfig::blefds_init( void )
+inline result_t BleConfig::blefds_init( void )
 {
     ret_code_t err_code;
     result_t result = RESULT_ERR;
@@ -707,7 +707,7 @@ _EXIT:
     return result;
 }
 
-void BleConfig::blefds_config_load_default( void )
+inline void BleConfig::blefds_config_load_default( void )
 {
     blefds_config.version = BLEFDS_CONFIG_VERSION;
 //    blefds_config.device_name_local = ble_device_name_local;
@@ -715,7 +715,7 @@ void BleConfig::blefds_config_load_default( void )
     blefds_config.force_ble = false;
 }
 
-result_t BleConfig::blefds_config_load( void )
+inline result_t BleConfig::blefds_config_load( void )
 {
     ret_code_t err_code;
     result_t result = RESULT_ERR;
@@ -761,7 +761,7 @@ _EXIT:
     return result;
 }
 
-result_t BleConfig::blefds_config_write( void )
+inline result_t BleConfig::blefds_config_write( void )
 {
     ret_code_t err_code;
     result_t result = RESULT_ERR;
@@ -801,13 +801,13 @@ _EXIT:
     return result;
 }
 
-void BleConfig::blefds_state_set( blefds_state_t blefds_state )
+inline void BleConfig::blefds_state_set( blefds_state_t blefds_state )
 {
     this->blefds_state = blefds_state;
     mcu_sleep_postpone();
 }
 
-void BleConfig::blefds_state_idle( void )
+inline void BleConfig::blefds_state_idle( void )
 {
     if( blefds_flag_write_req == true )
     {
@@ -815,7 +815,7 @@ void BleConfig::blefds_state_idle( void )
     }
 }
 
-void BleConfig::blefds_state_init( void )
+inline void BleConfig::blefds_state_init( void )
 {
     ret_code_t err_code;
 
@@ -829,7 +829,7 @@ void BleConfig::blefds_state_init( void )
     UNUSED( err_code );
 }
 
-void BleConfig::blefds_state_init_wait( void )
+inline void BleConfig::blefds_state_init_wait( void )
 {
     if( blefds_flag_initializing == true )
     {
@@ -839,7 +839,7 @@ void BleConfig::blefds_state_init_wait( void )
     blefds_state_set( BLEFDS_STATE_CONFIG_LOAD );
 }
 
-void BleConfig::blefds_state_config_load( void )
+inline void BleConfig::blefds_state_config_load( void )
 {
     result_t result = RESULT_ERR;
 
@@ -860,7 +860,7 @@ void BleConfig::blefds_state_config_load( void )
     blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
 }
 
-void BleConfig::blefds_state_config_write( void )
+inline void BleConfig::blefds_state_config_write( void )
 {
     result_t result = RESULT_ERR;
 
@@ -884,7 +884,7 @@ _EXIT:
     return;
 }
 
-void BleConfig::blefds_state_config_write_wait( void )
+inline void BleConfig::blefds_state_config_write_wait( void )
 {
     if( blefds_flag_writing == true )
     {
@@ -895,7 +895,7 @@ void BleConfig::blefds_state_config_write_wait( void )
     blefds_state_set( BLEFDS_STATE_IDLE );
 }
 
-void BleConfig::blefds_state_machine( void )
+inline void BleConfig::blefds_state_machine( void )
 {
     switch( blefds_state )
     {
