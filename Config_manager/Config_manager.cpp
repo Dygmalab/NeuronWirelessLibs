@@ -27,7 +27,18 @@
 /*                 External Functions                 */
 /******************************************************/
 
-extern void reset_mcu(void);
+/*
+ * The extern "C" is used here because other part of the libraries (Arduino) inserts it this way and thus the name reset_mcu is bound to C linkage
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern void reset_mcu( void );
+#ifdef __cplusplus
+}
+#endif
+
 
 /******************************************************/
 /*                 Configuration Items                */
