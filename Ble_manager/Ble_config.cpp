@@ -645,6 +645,11 @@ inline void BleConfig::fds_evt_write_process( fds_evt_t const * p_evt )
     blefds_flag_writing = false;
 }
 
+inline void BleConfig::fds_evt_gc_process( fds_evt_t const * p_evt )
+{
+    blefds_flag_gc_running = false;
+}
+
 inline void BleConfig::fds_event_process( fds_evt_t const * p_evt )
 {
     mcu_sleep_postpone();
@@ -664,14 +669,19 @@ inline void BleConfig::fds_event_process( fds_evt_t const * p_evt )
 
             break;
 
-//        case FDS_EVT_DEL_RECORD:
-//            break;
-//
-//        case FDS_EVT_DEL_FILE:
-//            break;
-//
-//        case FDS_EVT_GC:
-//            break;
+        case FDS_EVT_DEL_RECORD:
+        case FDS_EVT_DEL_FILE:
+
+            /* Record and File deletion is currently not performed in BLE config. The event comes from different FDS client module.
+             * Hence we ignore the operation. */
+
+            break;
+
+        case FDS_EVT_GC:
+
+            fds_evt_gc_process( p_evt);
+
+            break;
 
         default:
 
@@ -700,6 +710,8 @@ inline result_t BleConfig::blefds_init( void )
     blefds_flag_initializing = false;
     blefds_flag_write_req = false;
     blefds_flag_writing = false;
+    blefds_flag_gc_req = false;
+    blefds_flag_gc_running = false;
 
     blefds_state_set( BLEFDS_STATE_INIT );
 
@@ -782,13 +794,13 @@ inline result_t BleConfig::blefds_config_write( void )
     if ( err_code == NRF_SUCCESS )
     {
         err_code = fds_record_update( &fds_write_desc, &record );
-        ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_record_update failed" );
+        ASSERT_DYGMA( err_code == NRF_SUCCESS || err_code == FDS_ERR_NO_SPACE_IN_FLASH, "fds_record_update failed" );
         EXIT_IF_ERR_NRF( err_code, result, "fds_record_update failed" );
     }
     else if (err_code == FDS_ERR_NOT_FOUND)
     {
         err_code = fds_record_write( &fds_write_desc, &record );
-        ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_record_write failed" );
+        ASSERT_DYGMA( err_code == NRF_SUCCESS || err_code == FDS_ERR_NO_SPACE_IN_FLASH, "fds_record_write failed" );
         EXIT_IF_ERR_NRF( err_code, result, "fds_record_write failed" );
     }
     else
@@ -798,6 +810,12 @@ inline result_t BleConfig::blefds_config_write( void )
     }
 
 _EXIT:
+
+    if( err_code == FDS_ERR_NO_SPACE_IN_FLASH )
+    {
+        blefds_flag_gc_req = true;
+    }
+
     return result;
 }
 
@@ -807,11 +825,23 @@ inline void BleConfig::blefds_state_set( blefds_state_t blefds_state )
     mcu_sleep_postpone();
 }
 
+inline void BleConfig::blefds_state_config_write_set( void )
+{
+    blefds_flag_write_req = false;
+    blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
+}
+
+inline void BleConfig::blefds_state_gc_set( void )
+{
+    blefds_flag_gc_req = false;
+    blefds_state_set( BLEFDS_STATE_GC );
+}
+
 inline void BleConfig::blefds_state_idle( void )
 {
     if( blefds_flag_write_req == true )
     {
-        blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
+        blefds_state_config_write_set();
     }
 }
 
@@ -857,7 +887,7 @@ inline void BleConfig::blefds_state_config_load( void )
     blefds_config_load_default();
 
     /* Write the default BLE FDS config to the memory */
-    blefds_state_set( BLEFDS_STATE_CONFIG_WRITE );
+    blefds_state_config_write_set();
 }
 
 inline void BleConfig::blefds_state_config_write( void )
@@ -870,15 +900,17 @@ inline void BleConfig::blefds_state_config_write( void )
     result = blefds_config_write();
     EXIT_IF_ERR( result, "blefds_config_write failed" );
 
-    /* The write is in progress - clear the write request flag */
-    blefds_flag_write_req = false;
-
     blefds_state_set( BLEFDS_STATE_CONFIG_WRITE_WAIT );
 
 _EXIT:
     if( result != RESULT_OK )
     {
         blefds_flag_writing = false;
+    }
+
+    if( blefds_flag_gc_req == true )
+    {
+        blefds_state_gc_set();
     }
 
     return;
@@ -893,6 +925,40 @@ inline void BleConfig::blefds_state_config_write_wait( void )
 
     /* The FDS config is written - return to the Idle state */
     blefds_state_set( BLEFDS_STATE_IDLE );
+}
+
+inline void BleConfig::blefds_state_gc( void )
+{
+    ret_code_t err_code;
+    result_t result = RESULT_ERR;
+
+    blefds_flag_gc_running = true;
+
+    /* Try to start the garbage collection */
+    err_code = fds_gc();
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "fds_gc failed" );
+    EXIT_IF_ERR_NRF( err_code, result, "fds_gc failed" );
+
+    blefds_state_set( BLEFDS_STATE_GC_WAIT );
+
+_EXIT:
+    if( result != RESULT_OK )
+    {
+        blefds_flag_gc_running = false;
+    }
+
+    return;
+}
+
+inline void BleConfig::blefds_state_gc_wait( void )
+{
+    if( blefds_flag_gc_running == true )
+    {
+        return;
+    }
+
+    /* The FDS garbage collection has finished - return back to the config write process */
+    blefds_state_config_write_set();
 }
 
 inline void BleConfig::blefds_state_machine( void )
@@ -932,6 +998,18 @@ inline void BleConfig::blefds_state_machine( void )
         case BLEFDS_STATE_CONFIG_WRITE_WAIT:
 
             blefds_state_config_write_wait();
+
+            break;
+
+        case BLEFDS_STATE_GC:
+
+            blefds_state_gc();
+
+            break;
+
+        case BLEFDS_STATE_GC_WAIT:
+
+            blefds_state_gc_wait();
 
             break;
 

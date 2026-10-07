@@ -223,6 +223,8 @@ class BleConfig
             BLEFDS_STATE_CONFIG_LOAD,
             BLEFDS_STATE_CONFIG_WRITE,
             BLEFDS_STATE_CONFIG_WRITE_WAIT,
+            BLEFDS_STATE_GC,                /* Start Garbage collection */
+            BLEFDS_STATE_GC_WAIT,           /* Waiting for the Garbage collection */
         } blefds_state_t;
 
         blefds_config_t blefds_config;
@@ -233,6 +235,8 @@ class BleConfig
         bool_t blefds_flag_initializing;
         bool_t blefds_flag_write_req;
         bool_t blefds_flag_writing;
+        bool_t blefds_flag_gc_req;      /* FDS Garbage collection needed */
+        bool_t blefds_flag_gc_running;
 
         /* FDS */
         blefds_config_t fds_write_buffer;
@@ -245,16 +249,22 @@ class BleConfig
         inline result_t blefds_config_write( void );
 
         inline void blefds_state_set( blefds_state_t fds_state );
+        inline void blefds_state_config_write_set( void );
+        inline void blefds_state_gc_set( void );
+
         inline void blefds_state_idle( void );
         inline void blefds_state_init( void );
         inline void blefds_state_init_wait( void );
         inline void blefds_state_config_load( void );
         inline void blefds_state_config_write( void );
         inline void blefds_state_config_write_wait( void );
+        inline void blefds_state_gc( void );
+        inline void blefds_state_gc_wait( void );
         inline void blefds_state_machine( void );
 
         inline void fds_evt_init_process( fds_evt_t const * p_evt );
         inline void fds_evt_write_process( fds_evt_t const * p_evt );
+        inline void fds_evt_gc_process( fds_evt_t const * p_evt );
         inline void fds_event_process( fds_evt_t const * p_evt );
 
         static void fds_event_cb( fds_evt_t const * p_evt );
