@@ -830,6 +830,18 @@ _EXIT:
     return;
 }
 
+inline void BleManager::state_escape_process( void )
+{
+    /* Wait until softdevice-dependent ConfigManager processes are finished */
+    if( BleConfig.cfg_is_busy() == true )
+    {
+        return;
+    }
+
+    /* Restart the device */
+    reset_mcu();
+}
+
 inline void BleManager::state_machine( void )
 {
     switch( state )
@@ -885,6 +897,12 @@ inline void BleManager::state_machine( void )
         case BLEM_STATE_ADVERTISING_FAIL:
 
             state_advertising_fail_process();
+
+            break;
+
+        case BLEM_STATE_ESCAPE:
+
+            state_escape_process();
 
             break;
 
@@ -1099,6 +1117,14 @@ inline void BleManager::blehmi_event_type_deactivate_request_process( void )
     }
 }
 
+inline void BleManager::blehmi_event_type_escape_request_process( void )
+{
+    /*
+     * When the escape HMI event is received, we go straight to the escape state which results in the system restart
+     */
+    state_set( BLEM_STATE_ESCAPE );
+}
+
 inline void BleManager::blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param )
 {
     switch( event_type )
@@ -1124,6 +1150,12 @@ inline void BleManager::blehmi_event_process( BleHmi::blehmi_event_type_t event_
         case BleHmi::BLEHMI_EVENT_TYPE_DEACTIVATE_REQ:
 
             blehmi_event_type_deactivate_request_process( );
+
+            break;
+
+        case BleHmi::BLEHMI_EVENT_TYPE_ESCAPE_REQ:
+
+            blehmi_event_type_escape_request_process( );
 
             break;
 

@@ -123,6 +123,8 @@ class BleManager
         BLEM_STATE_DISABLE,
         BLEM_STATE_RESTART,
         BLEM_STATE_ADVERTISING_FAIL,
+
+        BLEM_STATE_ESCAPE,
     } blem_state_t;
 
 
@@ -159,8 +161,8 @@ class BleManager
     uint8_t battery_level;
 
     /* Flags */
-    bool_t enable_request_flag;
-    bool_t enabled_flag;
+    bool_t enable_request_flag = false;
+    bool_t enabled_flag = false;
 
 //    result_t channels_init( void );
 //    void channels_update( void );
@@ -187,6 +189,7 @@ class BleManager
     inline void state_disable_process( void );
     inline void state_restart_process( void );
     inline void state_advertising_fail_process( void );
+    inline void state_escape_process( void );
     inline void state_machine( void );
 
     inline result_t blecfg_init( void );
@@ -201,6 +204,7 @@ class BleManager
     inline void blehmi_event_type_channel_erase_process( BleHmi::blehmi_evt_channel_erase_param_t * p_channel_erase_param );
     inline void blehmi_event_type_bond_code_ready_process( BleHmi::blehmi_evt_bond_code_ready_param_t * p_bond_code_ready_param );
     inline void blehmi_event_type_deactivate_request_process( void );
+    inline void blehmi_event_type_escape_request_process( void );
     inline void blehmi_event_process( BleHmi::blehmi_event_type_t event_type, BleHmi::blehmi_evt_param_t * p_param );
 
     void bat_level_update( void );
