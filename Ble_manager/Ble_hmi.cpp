@@ -353,8 +353,15 @@ _EXIT:
     /* In case a Channel ID has not been resolved */
     if ( result == RESULT_ERR )
     {
+        /* Check if the escape key has been pressed in the HMI active state */
+        if( ( (p_key->coord.col == 0 && p_key->coord.row == 0) || (p_key->coord.col == 9 && p_key->coord.row == 0) ) && p_key->toggled_on )
+        {
+            hmi_event_process( p_instance, BLEHMI_EVENT_TYPE_ESCAPE_REQ, NULL );
+
+            return RESULT_OK;
+        }
         /* Check the Bluetooth Pairing key has been press in the HMI active state */
-        if( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING )
+        else if( p_key->type == KBDAPI_KEY_TYPE_BLUETOOTH_PAIRING )
         {
             if( p_key->toggled_on == true )
             {
