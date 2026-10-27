@@ -21,7 +21,7 @@
 
 #include "KeyboardioHID.h"
 #include "ble_hid_service.h"    // INPUT_REPORT_LEN_RAW
-#include "Ble_composite_dev.h"  // ble_connected()
+#include "Ble_manager.h"
 #include "Adafruit_TinyUSB.h"   // TinyUSBDevice.mounted()
 
 #define DEBUG_LOG_OVERLAY_PROCESSING    0
@@ -89,7 +89,7 @@ void OverlayProcessing::run( void )
 
 bool OverlayProcessing::host_connected( void )
 {
-    return ble_connected() || TinyUSBDevice.mounted();
+    return ( BleManager.is_connected() == true ) || ( TinyUSBDevice.mounted() == true );
 }
 
 void OverlayProcessing::send_packet( packet_t type, uint8_t payload )
@@ -101,13 +101,13 @@ void OverlayProcessing::send_packet( packet_t type, uint8_t payload )
 
     /* BLE and USB carry the same packet, but the raw HID report length differs:
      * BLE uses the full 200-byte report, USB is capped at 63 data bytes. */
-    if ( ble_connected() )
+    if ( BleManager.is_connected() == true )
     {
-        uint8_t buf[INPUT_REPORT_LEN_RAW] = {};
+        uint8_t buf[BLE_INPUT_REPORT_LEN_RAW] = {};
         buf[0] = OVERLAY_MAGIC_BYTE;
         buf[1] = (uint8_t)type;
         buf[2] = payload;
-        HID().SendReport( HID_REPORTID_RAWHID, buf, INPUT_REPORT_LEN_RAW );
+        HID().SendReport( HID_REPORTID_RAWHID, buf, BLE_INPUT_REPORT_LEN_RAW );
         return;
     }
 

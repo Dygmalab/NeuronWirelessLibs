@@ -25,15 +25,15 @@
 
 #include "RawHID.h"
 #include "Adafruit_TinyUSB.h"
-#include "Ble_composite_dev.h"
+#include "Ble_manager.h"
 #include "ble_hid_service.h"
 #include "hidDefy.h"
 
 tu_fifo_t rx_ff;
 tu_fifo_t tx_ff;
 
-uint8_t rx_ff_buf[OUTPUT_REPORT_LEN_RAW*50];//UP to 50 messages
-uint8_t tx_ff_buf[INPUT_REPORT_LEN_RAW*50];//Up to 50 messages
+uint8_t rx_ff_buf[ BLE_OUTPUT_REPORT_LEN_RAW * 50];//UP to 50 messages
+uint8_t tx_ff_buf[ BLE_INPUT_REPORT_LEN_RAW * 50 ];     //Up to 50 messages
 
 
 RawHID_ RawHID;
@@ -58,15 +58,15 @@ size_t RawHID_::read(uint8_t *buffer, size_t size)
 
 void RawHID_::flush(void)
 {
-    if(!ble_connected()) return;
+    if(!BleManager.is_connected()) return;
     uint16_t size = tu_fifo_count(&tx_ff);
     if (size ==0) return;
-    uint8_t buff[INPUT_REPORT_LEN_RAW];
-    memset(buff,0,INPUT_REPORT_LEN_RAW);
-    uint16_t i = tu_fifo_peek_n(&tx_ff, buff, INPUT_REPORT_LEN_RAW);
+    uint8_t buff[BLE_INPUT_REPORT_LEN_RAW];
+    memset(buff,0,BLE_INPUT_REPORT_LEN_RAW);
+    uint16_t i = tu_fifo_peek_n(&tx_ff, buff, BLE_INPUT_REPORT_LEN_RAW);
     if (i != 0)
     {
-        if (ble_send_report(HID_REPORTID_RAWHID, buff, INPUT_REPORT_LEN_RAW)){
+        if (blehid_send_report(HID_REPORTID_RAWHID, buff, BLE_INPUT_REPORT_LEN_RAW)){
             tu_fifo_advance_read_pointer(&tx_ff, i);
         }
     }
@@ -80,13 +80,13 @@ size_t RawHID_::write(uint8_t ch)
 
 size_t RawHID_::write(const uint8_t *buffer, size_t size)
 {
-    if(!ble_connected()) return 0;
+    if(!BleManager.is_connected()) return 0;
     return tu_fifo_write_n(&tx_ff, buffer, size);
 }
 
 int RawHID_::availableForWrite(void)
 {
-    return ble_connected();
+    return BleManager.is_connected();
 }
 
 RawHID_::~RawHID_()
@@ -125,7 +125,7 @@ extern "C"
 
     bool callBackRawHID(uint8_t *buff)
     {
-        size_t size = strnlen_s((char *)buff, OUTPUT_REPORT_LEN_RAW);
+        size_t size = strnlen_s((char *)buff, BLE_OUTPUT_REPORT_LEN_RAW);
         tu_fifo_write_n(&rx_ff, buff, (uint16_t) size);
         return false;
     }

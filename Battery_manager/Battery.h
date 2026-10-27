@@ -21,18 +21,13 @@
 #include <cstdint>
 
 #include "kbd_if.h"
+#include "LEDManager.h"
 #include "Time_counter.h"
 
 #define DISCONNECT_GRACE_TIMEOUT_MS     3000
 #define LAST_STATUS_PACKET_TIMEOUT_MS   1500
 
 class Battery {
-   public:
-    typedef struct PACK
-    {
-        uint8_t saving_mode;;
-    } battery_conf_t;
-
    public:
     result_t init( void );
     void run( void );
@@ -46,6 +41,11 @@ class Battery {
     result_t kbdif_initialize(void);
 
    private:
+
+    typedef struct PACK
+    {
+        uint8_t saving_mode;;
+    } battery_conf_t;
 
     static const battery_conf_t * p_battery_conf;
 
@@ -121,6 +121,8 @@ class Battery {
 
     static bat_status_side_t right;
     static bat_status_side_t left; 
+
+    static LEDManager::LEDManager_prio_lock_t LEDManager_prio_lock;
 
     static const kbdif_handlers_t kbdif_handlers;
 

@@ -20,60 +20,33 @@
 #pragma once
 
 #include "dl_middleware.h"
+
+#include "Config_image.h"
+#include "EEPROM.h"
 #include "Time_counter.h"
 
-#include "kbd_memory.h"
+#define FLASH_IMAGE_NUM_PAGES           ( FLASH_STORAGE_NUM_PAGES / 2 )
+#define FLASH_IMAGE_SIZE                ( FLASH_IMAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )    /* Size of one image in the flash */
+
+#define CONFIG_CACHE_SIZE               CONFIG_IMAGE_DATA_SIZE(FLASH_IMAGE_SIZE)
 
 class ConfigManager
 {
     public:
 
-        typedef enum
-        {
-            CFG_ITEM_TYPE_DEVICE_SPEC = 1,
+        result_t init( void );
 
-            CFG_ITEM_TYPE_LEDS_LEDMANAGER = 10,
-            CFG_ITEM_TYPE_LEDS_PALETTE,
-            CFG_ITEM_TYPE_LEDS_COLORMAP,
-
-            CFG_ITEM_TYPE_BATTERY = 20,
-
-            CFG_ITEM_TYPE_BLE_CONNECTIONS = 30,
-
-            CFG_ITEM_TYPE_RF = 40,
-        } cfg_item_type_t;
-
-        typedef result_t (* cfg_item_request_cb)( cfg_item_type_t item_type, const void ** pp_item );
-        typedef result_t (* cfg_item_request_kbdmem_cb)( kbdmem_item_type_t item_type, const void ** pp_item );
-
-        typedef struct
-        {
-            uint8_t * p_config_cache;
-            uint16_t config_cache_size;
-
-            /* Callbacks */
-            cfg_item_request_cb item_request_cb;
-            cfg_item_request_kbdmem_cb item_request_kbdmem_cb;
-        } ConfigManager_config_t;
-
-    public:
-
-        result_t init( const ConfigManager_config_t * p_config );
-
-        result_t config_item_request( cfg_item_type_t item_type, const void ** pp_item );
+        result_t config_item_request( const void ** pp_config_item, uint16_t item_size );
         result_t config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size );
 
-        void config_save_now( void );
+        bool_t is_busy( void );
 
         void run( void );
 
     private:
-        uint8_t * p_cache;      /* Must come from within the RAM space */
-        uint16_t cache_size;
 
-        /* Callbacks */
-        cfg_item_request_cb item_request_cb = nullptr;
-        cfg_item_request_kbdmem_cb item_request_kbdmem_cb = nullptr;
+        uint8_t cache[ CONFIG_CACHE_SIZE ] __attribute__((aligned(MCU_ALIGNMENT_SIZE)));
+        uint8_t * p_cache_pointer;
 
         bool_t item_validity_check( const void * p_item_add, uint16_t item_size );
 
@@ -88,11 +61,27 @@ class ConfigManager
     private:
 
         void kbdmem_ll_init( void );
-        INLINE result_t kbdmem_ll_item_request( kbdmem_item_type_t item_type, const void ** pp_item );
+        INLINE result_t kbdmem_ll_item_request( const void ** pp_config_item, uint16_t item_size );
         INLINE result_t kbdmem_ll_data_save( const void * p_mem_target, const void * p_data, uint16_t data_len );
 
-        static result_t kbdmem_ll_item_request_cb( void * p_instance, kbdmem_item_type_t item_type, const void ** pp_item );
+        static result_t kbdmem_ll_item_request_cb( void * p_instance, const void ** pp_config_item, uint16_t item_size );
         static result_t kbdmem_ll_data_save_cb( void * p_instance, const void * p_mem_target, const void * p_data, uint16_t data_len );
+
+        /********************************************/
+        /*              Config Images               */
+        /********************************************/
+
+    private:
+
+        ConfigImage image_1;
+        ConfigImage image_2;
+
+        ConfigImage * p_image_primary;
+        ConfigImage * p_image_secondary;
+
+        INLINE result_t images_init( void );
+        INLINE void images_save_start( void );
+        INLINE void images_run( void );
 
         /****************************************************/
         /*                     Machine                      */
@@ -100,12 +89,17 @@ class ConfigManager
 
     private:
 
-    #define CONFIG_SAVE_TIMEOUT_MS    200
+    #define CONFIG_SAVE_TIMEOUT_MS    50
 
         typedef enum
         {
             CONFIG_STATE_IDLE = 1,
-            CONFIG_STATE_SAVE,
+            CONFIG_STATE_SAVE_START,
+            CONFIG_STATE_IMAGE_SECONDARY_SAVE,
+            CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT,
+            CONFIG_STATE_IMAGE_PRIMARY_SAVE,
+            CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT,
+            CONFIG_STATE_SAVE_FINISH,
         } config_state_t;
 
         config_state_t machine_state = CONFIG_STATE_IDLE;
@@ -115,7 +109,13 @@ class ConfigManager
 
         INLINE void machine_state_set( config_state_t state );
         INLINE void machine_state_idle( void );
-        INLINE void machine_state_save( void );
+        INLINE void machine_state_save_start( void );
+        INLINE void machine_state_image_secondary_save( void );
+        INLINE void machine_state_image_secondary_save_wait( void );
+        INLINE void machine_state_image_primary_save( void );
+        INLINE void machine_state_image_primary_save_wait( void );
+        INLINE void machine_state_save_finish( void );
+
         INLINE void machine( void );
 };
 

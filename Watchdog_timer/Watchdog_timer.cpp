@@ -47,13 +47,15 @@ void Watchdog_timer::init(void)
     nrf_drv_wdt_config_t config = NRF_DRV_WDT_DEAFULT_CONFIG;
 
     ret_code_t err_code = nrf_drv_wdt_init(&config, watchdog_event_handler);
-    APP_ERROR_CHECK(err_code);
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "nrf_drv_wdt_init failed" );
 
     err_code = nrf_drv_wdt_channel_alloc(&wdt_channel_id);
-    APP_ERROR_CHECK(err_code);
+    ASSERT_DYGMA( err_code == NRF_SUCCESS, "nrf_drv_wdt_channel_alloc failed" );
 
     nrf_drv_wdt_enable();
     inited = true;
+
+    UNUSED( err_code );
 #endif
 }
 
