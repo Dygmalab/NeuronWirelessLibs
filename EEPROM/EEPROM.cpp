@@ -35,6 +35,11 @@ extern "C"
 {
 #endif
 
+/* FDS is used only for the memory structure calculation and correct placement of the keyboard configuration memory.
+ * DO NOT use it for anything else! */
+#include "fds.h"
+#include "fds_internal_defs.h"
+
 #include "nrf_fstorage.h"
 
 #ifdef SOFTDEVICE_PRESENT
@@ -67,7 +72,7 @@ extern "C"
     We reserve 2 pages 0x00073000 and 0x00074000 for the EEPROM class.
     The Bluetooth module uses the Nordic FDS library, and 3 pages are reserved for it from 0x00070000
     to 0x00072000 (pages 112, 113 and 114).
-    Pages 39 to 113 are free to be used by the main application.
+    Pages 39 to 111 are free to be used by the main application.
 
     Flash memory map:
         Page 127 (0x0007F000) -> MBR parameters storage. Last memory page.
@@ -83,14 +88,15 @@ extern "C"
         Page 118 (0x00076000) -> Bootloader.
         Page 117 (0x00075000) -> Bootloader.
 
-        Page 116 (0x00074000) -> EEPROM class. It uses fstorage library from the SDK.
-        Page 115 (0x00073000) -> EEPROM class.
 
-        Page 114 (0x00072000) -> FDS library used by the peer manager module in the Bluetooth.
-        Page 113 (0x00071000) -> FDS library.
-        Page 112 (0x00070000) -> FDS library.
+        Page 116 (0x00074000) -> FDS library used by the peer manager module in the Bluetooth.
+        Page 115 (0x00073000) -> FDS library.
+        Page 114 (0x00072000) -> FDS library
 
-        Page 113 (0x00069000) -> Max Main App.
+        Page 113 (0x00071000) -> EEPROM class. It uses fstorage library from the SDK.
+        Page 112 (0x00070000) -> EEPROM class..
+
+        Page 111 (0x0006F000) -> Max Main App.
         .
         .
         Page 39  (0x00027000) -> Min Main App.
@@ -108,25 +114,26 @@ extern "C"
           used by the EEPROM class. This way it is easier to add memory pages as we need them
           to be used by Kaleidoscope.
 */
-#define FLASH_STORAGE_NUM_PAGES                 2
-#define FLASH_STORAGE_PAGE_SIZE                 4096    /* Size of the flash pages in Bytes. */
-#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
 
+/* This is temporary check until all our Neuron Wireless projects are switched to the new FLASH structure */
+#if FDS_PHY_PAGES_RESERVED != 0
+#error "FDS_VIRTUAL_PAGES_RESERVED needs to be set to 0 in sdk_config.h after the last memory structure change"
+#endif /* FDS_PHY_PAGES_RESERVED */
+
+#define FLASH_FDS_SIZE                          ( FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof( uint32_t ) )
+
+#define FLASH_STORAGE_SIZE                      ( FLASH_STORAGE_NUM_PAGES * FLASH_STORAGE_PAGE_SIZE )
 #define FLASH_STORAGE_FIRST_PAGE_START_ADDR     flash_first_page_start_addr_get()
 #define FLASH_STORAGE_LAST_PAGE_END_ADDR        flash_last_page_end_addr_get()
 
-#define FLASH_STORAGE_ALIGN                     4       /* The FLASH data is aligned by 4 bytes */
+#define FLASH_STORAGE_ALIGN                     MCU_ALIGNMENT_SIZE       /* The FLASH data is aligned by 4 bytes */
 
-volatile static bool flag_write_completed = false;
-volatile static bool flag_erase_completed = false;
-
-static void fstorage_evt_handler(nrf_fstorage_evt_t *evt);
 static inline uint32_t flash_first_page_start_addr_get(void);
 static inline uint32_t flash_last_page_end_addr_get(void);
 
 // Creates an fstorage instance.
 NRF_FSTORAGE_DEF(nrf_fstorage_t fstorage_instance) = {
-    .evt_handler = fstorage_evt_handler,
+    .evt_handler = EEPROMClass::fstorage_evt_handler_nrf,
 
     /*
         You must set these manually, even at runtime, before nrf_fstorage_init() is called.
@@ -157,7 +164,7 @@ static inline uint32_t flash_first_page_start_addr_get(void)
 
     uint32_t end_addr = (bootloader_addr != 0xFFFFFFFF) ? bootloader_addr : (code_sz * page_sz);
 
-    return end_addr - FLASH_STORAGE_SIZE;
+    return end_addr - FLASH_FDS_SIZE - FLASH_STORAGE_SIZE;
 }
 
 static inline uint32_t flash_last_page_end_addr_get(void)
@@ -165,56 +172,73 @@ static inline uint32_t flash_last_page_end_addr_get(void)
     return flash_first_page_start_addr_get() + FLASH_STORAGE_SIZE - 1;
 }
 
-static void fstorage_evt_handler(nrf_fstorage_evt_t *p_evt)
+inline void EEPROMClass::event_handler( eeprom_event_type_t event_type )
 {
-    if (p_evt->result != NRF_SUCCESS)
+    if( event_cb == NULL )
     {
-        NRF_LOG_ERROR("EEPROM: Error while executing an fstorage operation.");
-        NRF_LOG_FLUSH();
+        return;
+    }
+
+    event_cb( p_instance, event_type );
+}
+
+/************************************************************/
+/*                         fstorage                         */
+/************************************************************/
+
+void EEPROMClass::fstorage_evt_handler( nrf_fstorage_evt_t * p_evt )
+{
+    if ( p_evt->result != NRF_SUCCESS )
+    {
+        NRF_LOG_ERROR( "EEPROM: Error while executing an fstorage operation." );
+        NRF_LOG_FLUSH( );
 
         return;
     }
 
-    switch (p_evt->id)
+    switch ( p_evt->id )
     {
         case NRF_FSTORAGE_EVT_WRITE_RESULT:
-        {
 #if FLASH_STORAGE_DEBUG_WRITE
-            NRF_LOG_DEBUG("EEPROM: Writing completed.");
-            NRF_LOG_FLUSH();
+            NRF_LOG_DEBUG( "EEPROM: Writing completed." );
+            NRF_LOG_FLUSH( );
 #endif
+            eeprom_busy_flag = false;
 
-            flag_write_completed = true;
-        }
-        break;
+            event_handler( EEPROM_EVENT_TYPE_WRITE_FINISHED );
+
+            break;
 
         case NRF_FSTORAGE_EVT_ERASE_RESULT:
-        {
-#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
-            NRF_LOG_DEBUG("EEPROM: Erase completed.");
-            NRF_LOG_FLUSH();
-#endif
 
-            flag_erase_completed = true;
-        }
-        break;
+#if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
+            NRF_LOG_DEBUG( "EEPROM: Erase completed." );
+            NRF_LOG_FLUSH( );
+#endif
+            eeprom_busy_flag = false;
+
+            event_handler( EEPROM_EVENT_TYPE_ERASE_FINISHED );
+
+            break;
 
         default:
-        {
-        }
-        break;
+
+            ASSERT_DYGMA( false, "Unhandled fstorage event detected" );
+
+            break;
     }
 }
 
-result_t EEPROMClass::init( void )
+void EEPROMClass::fstorage_evt_handler_nrf( nrf_fstorage_evt_t * p_evt )
 {
-    nrf_fstorage_api_t *fs_api;
+    EEPROMClass * p_eeprom = ( EEPROMClass *)p_evt->p_param;
+    p_eeprom->fstorage_evt_handler( p_evt );
+}
 
-    if( initialized == true )
-    {
-        /* The EEPROM is already initialized */
-        return RESULT_OK;
-    }
+result_t EEPROMClass::fstorage_init( void )
+{
+    ret_code_t rc;
+    nrf_fstorage_api_t *fs_api;
 
 #ifdef SOFTDEVICE_PRESENT
 #if FLASH_STORAGE_DEBUG_READ or FLASH_STORAGE_DEBUG_WRITE
@@ -232,23 +256,92 @@ result_t EEPROMClass::init( void )
     fs_api = &nrf_fstorage_nvmc;
 #endif
 
-    ret_code_t rc = nrf_fstorage_init(&fstorage_instance, fs_api, NULL);
+    rc = nrf_fstorage_init( &fstorage_instance, fs_api, this );
     if( rc != NRF_SUCCESS )
     {
         return RESULT_ERR;
     }
-    APP_ERROR_CHECK(rc);
-
-    /* Initially, the whole EEPROM space is protected and forcing the erase needs to be called before any write */
-    addr_offset_protected = FLASH_STORAGE_SIZE;
-    initialized = true;
 
     return RESULT_OK;
 }
 
-uint32_t EEPROMClass::align_get(void)
+/************************************************************/
+/*                           API                            */
+/************************************************************/
+
+result_t EEPROMClass::init( void )
+{
+    result_t result = RESULT_ERR;
+
+    if( initialized_flag == true )
+    {
+        /* The EEPROM is already initialized */
+        return RESULT_OK;
+    }
+
+    result = fstorage_init( );
+    EXIT_IF_ERR( result, "fstorage_init failed" );
+
+    /* Reservation */
+    reserve_lock = 0;
+
+    /* Set the flags */
+    eeprom_busy_flag = false;
+    is_reserved_flag = false;
+
+    /* Set the initialized flag */
+    initialized_flag = true;
+
+_EXIT:
+    return result;
+}
+
+uint32_t EEPROMClass::align_get( void )
 {
     return FLASH_STORAGE_ALIGN;
+}
+
+result_t EEPROMClass::reserve( eeprom_lock_t * p_lock, void * p_instance, eeprom_event_cb event_cb )
+{
+    if( is_reserved_flag == true )
+    {
+        /* The EEPROM module is already reserved */
+        return RESULT_ERR;
+    }
+
+    /* Event callback */
+    this->p_instance = p_instance;
+    this->event_cb = event_cb;
+
+    /* Set the reservation lock */
+    reserve_lock = reserve_lock + 1;
+    *p_lock = reserve_lock;
+
+    is_reserved_flag = true;
+
+    return RESULT_OK;
+}
+
+result_t EEPROMClass::release( eeprom_lock_t lock )
+{
+    if( is_reserved_flag == false )
+    {
+        /* The EEPROM module is already released */
+        return RESULT_OK;
+    }
+    else if( lock != reserve_lock )
+    {
+        ASSERT_DYGMA( false, "Trying to release the EEPROM with an invalid lock" );
+        return RESULT_ERR;
+    }
+
+    /* Event callback */
+    this->p_instance = NULL;
+    this->event_cb = NULL;
+
+    is_reserved_flag = false;
+
+    return RESULT_OK;
 }
 
 result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_size )
@@ -264,15 +357,11 @@ result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_
         return RESULT_ERR;
     }
 
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
-    {
-        yield();  // Meanwhile execute tasks.
-    }
-
     // At startup, EEPROMclass loads all the flash memory pages it uses.
     ret_code_t ret_code = nrf_fstorage_read( &fstorage_instance, FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, p_data, data_size );
     if ( ret_code != NRF_SUCCESS )
     {
+        ASSERT_DYGMA(false, "EEPROM read is not expected to fail");
         return RESULT_ERR;
     }
 
@@ -284,39 +373,41 @@ result_t EEPROMClass::read( uint32_t addr_offset, uint8_t * p_data, size_t data_
     return RESULT_OK;
 }
 
-result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_t data_size )
+result_t EEPROMClass::write( eeprom_lock_t lock, uint32_t addr_offset, const uint8_t * p_data, size_t data_size )
 {
-    if (data_size == 0)
+    if( is_reserved_flag == false || lock != reserve_lock )
+    {
+        ASSERT_DYGMA( false, "The caller of the function has not reserved the EEPROM module" );
+        return RESULT_ERR;
+    }
+    else if (data_size == 0)
     {
         /* Nothing to write */
         return RESULT_OK;
-    }
-    else if( addr_offset < addr_offset_protected )
-    {
-        ASSERT_DYGMA(false, "Trying to write into protected EEPROM space");
-        return RESULT_ERR;
     }
     else if( addr_offset + data_size > FLASH_STORAGE_SIZE )
     {
         ASSERT_DYGMA(false, "EEPROM available space overflow");
         return RESULT_ERR;
     }
-
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
+    /*
+     * nrf_fstorage_is_busy( NULL ) - using NULL to check all fstorage instances over the system
+     */
+    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
     {
-        yield();  // Meanwhile execute tasks.
+        return RESULT_BUSY;
     }
 
 #if FLASH_STORAGE_DEBUG_ERASE_PAGE
     NRF_LOG_DEBUG("EEPROM: Writing flash...");
     NRF_LOG_FLUSH();
 #endif
-    flag_write_completed = false;
+    eeprom_busy_flag = true;
     ret_code_t ret_code = nrf_fstorage_write(&fstorage_instance,
                                              FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset,
                                              p_data,
                                              data_size,
-                                             NULL);
+                                             this);
     if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Write error, ret_code = %d", ret_code);
@@ -334,7 +425,7 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
            internal queue of operations is full.
         */
 
-        flag_write_completed = true;
+        eeprom_busy_flag = false;
 
         return RESULT_ERR;
     }
@@ -346,33 +437,44 @@ result_t EEPROMClass::write( uint32_t addr_offset, const uint8_t * p_data, size_
 
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
-    while (!flag_write_completed)
-    {
-        yield();  // Meanwhile execute tasks.
-    }
 
-    /* Shift the protected address offset */
-    addr_offset_protected = addr_offset + data_size;
 
     return RESULT_OK;
 }
 
-result_t EEPROMClass::erase(void)
+result_t EEPROMClass::erase_raw( eeprom_lock_t lock, uint32_t address, uint32_t page_cnt )
 {
-    while (nrf_fstorage_is_busy( &fstorage_instance ))  // Wait until fstorage is available.
+    if( is_reserved_flag == false || lock != reserve_lock )
     {
-        yield();  // Meanwhile execute tasks.
+        ASSERT_DYGMA( false, "The caller of the function has not reserved the EEPROM module" );
+        return RESULT_ERR;
+    }
+    /*
+     * nrf_fstorage_is_busy( NULL ) - using NULL to check all fstorage instances over the system
+     */
+    else if( eeprom_busy_flag == true || nrf_fstorage_is_busy( NULL ) == true )
+    {
+        return RESULT_BUSY;
+    }
+    else if( address % FLASH_STORAGE_PAGE_SIZE != 0 )
+    {
+        ASSERT_DYGMA(false, "EEPROM invalid erase address (not aligned)");
+        return RESULT_ERR;
+    }
+    else if( address < FLASH_STORAGE_FIRST_PAGE_START_ADDR ||
+         ( ( address - FLASH_STORAGE_FIRST_PAGE_START_ADDR ) / FLASH_STORAGE_PAGE_SIZE ) + page_cnt > FLASH_STORAGE_NUM_PAGES )
+    {
+        ASSERT_DYGMA(false, "EEPROM invalid erase address (out of range)");
+        return RESULT_ERR;
     }
 
 #if FLASH_STORAGE_DEBUG_ERASE_PAGE
     NRF_LOG_DEBUG("EEPROM: Erasing flash...");
     NRF_LOG_FLUSH();
 #endif
-    flag_erase_completed = false;
-    ret_code_t ret_code = nrf_fstorage_erase(&fstorage_instance,
-                                             FLASH_STORAGE_FIRST_PAGE_START_ADDR,
-                                             FLASH_STORAGE_NUM_PAGES,
-                                             NULL);
+    eeprom_busy_flag = true;
+
+    ret_code_t ret_code = nrf_fstorage_erase( &fstorage_instance, address, page_cnt, this );
     if (ret_code != NRF_SUCCESS)
     {
         NRF_LOG_ERROR("EEPROM: Erase error, ret_code = %lu", ret_code);
@@ -390,7 +492,7 @@ result_t EEPROMClass::erase(void)
            internal queue of operations is full.
         */
 
-        flag_erase_completed = true;
+        eeprom_busy_flag = false;
 
         return RESULT_ERR;
     }
@@ -402,14 +504,25 @@ result_t EEPROMClass::erase(void)
 
         If error, try increasing NRF_FSTORAGE_SD_MAX_RETRIES and NRF_FSTORAGE_SD_QUEUE_SIZE.
     */
-    while (!flag_erase_completed)
-    {
-        yield();  // Meanwhile execute tasks.
-    }
-
-    addr_offset_protected = 0;
 
     return RESULT_OK;
+}
+
+result_t EEPROMClass::erase_offset( eeprom_lock_t lock, uint32_t addr_offset, uint32_t page_cnt )
+{
+    return erase_raw( lock, FLASH_STORAGE_FIRST_PAGE_START_ADDR + addr_offset, page_cnt );
+}
+
+result_t EEPROMClass::erase_all( eeprom_lock_t lock )
+{
+    return erase_raw( lock, FLASH_STORAGE_FIRST_PAGE_START_ADDR, FLASH_STORAGE_NUM_PAGES );
+}
+
+const void * EEPROMClass::data_ptr_get( uint32_t addr_offset )
+{
+    ASSERT_DYGMA( addr_offset < FLASH_STORAGE_SIZE, "EEPROMClass invalid addr_offset detected" );
+
+    return ( const void *)(flash_first_page_start_addr_get() + addr_offset);
 }
 
 EEPROMClass EEPROM;

@@ -92,7 +92,7 @@ bool Twi_master::init(nrf_twim_frequency_t speed, bool hold_pullup_uninit)
     twi_master_config.hold_bus_uninit = hold_pullup_uninit;  // Hold pull up state on GPIO pins after uninit.
 
     nrfx_err_t ret = nrfx_twim_init(&twi_master_driver, &twi_master_config, NULL, NULL);
-    APP_ERROR_CHECK(ret);
+    ASSERT_DYGMA( ret == NRFX_SUCCESS, "nrfx_twim_init failed" );
 
     if (ret != NRF_SUCCESS)
     {
@@ -122,6 +122,8 @@ bool Twi_master::init(nrf_twim_frequency_t speed, bool hold_pullup_uninit)
     nrfx_twim_enable(&twi_master_driver);
     
     return true;
+
+    UNUSED( ret );
 }
 
 bool Twi_master::transfer_completed(void)

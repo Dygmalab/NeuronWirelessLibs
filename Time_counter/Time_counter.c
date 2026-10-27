@@ -279,13 +279,15 @@ void timer_counter_init(uint32_t micros_resolution_)
     timer_config.p_context = NULL;
 
     ret_code_t ret = nrf_drv_timer_init(&driver_timer, &timer_config, _nrf_drv_event_handler);
-    APP_ERROR_CHECK(ret);
+    ASSERT_DYGMA( ret == NRF_SUCCESS, "nrf_drv_timer_init failed" );
 
     nrf_drv_timer_extended_compare(&driver_timer, TIMER_OVFLW_CHANNEL, TIMER_SYSTIM_TICK_OVFLW_VAL, TIMER_OVFLW_SHORT_CLEAR, true);
 
     nrf_drv_timer_enable(&driver_timer);
 
     initialized = true;
+
+    UNUSED( ret );
 }
 
 systim_tick_t timer_counter_get_micros(void)
@@ -339,4 +341,66 @@ bool timer_check( dl_timer_t * p_timer )
     _interrupt_enable( );
 
     return ret_val;
+}
+
+void timer_delay_ms( uint32_t timeout_ms )
+{
+    dl_timer_t delay_timer = 0;
+
+    //set the timer
+    timer_set_ms( &delay_timer, timeout_ms );
+
+    while ( !timer_check( &delay_timer ) )
+    {
+        mcu_sleep_control( );
+    }
+}
+
+
+/************ Measuring ************/
+void timer_measure_start( systim_tick_t * p_meas_ticks_start )
+{
+    _systim_ticks_update( );
+
+    //stop interrupts
+    _interrupt_disable( );
+
+    //compute the target threshold value in number of ticks
+    *p_meas_ticks_start = systim_ticks;
+
+    //resume interrupts
+    _interrupt_enable( );
+}
+
+systim_tick_t timer_measure_stop( systim_tick_t meas_ticks_start )
+{
+
+    systim_tick_t meas_ticks_result;
+
+    _systim_ticks_update( );
+
+    //stop interrupts
+    _interrupt_disable( );
+
+    //compute the target threshold value in number of ticks
+    meas_ticks_result = systim_ticks - meas_ticks_start;
+
+    //resume interrupts
+    _interrupt_enable( );
+
+    return meas_ticks_result;
+}
+
+uint64_t timer_measure_stop_us( systim_tick_t meas_ticks_start )
+{
+    systim_tick_t meas_ticks = timer_measure_stop( meas_ticks_start );
+
+    return SYSTIM_TICK_CNT_TO_US( meas_ticks );
+}
+
+uint64_t timer_measure_stop_ms( systim_tick_t meas_ticks_start )
+{
+    systim_tick_t meas_ticks = timer_measure_stop( meas_ticks_start );
+
+    return SYSTIM_TICK_CNT_TO_MS( meas_ticks );
 }

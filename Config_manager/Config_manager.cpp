@@ -18,12 +18,36 @@
  */
 
 #include "Config_manager.h"
-#include "EEPROM.h"
+#include "kbd_memory.h"
+
+#define FLASH_IMAGE_1_ADDR_OFFSET      0
+#define FLASH_IMAGE_2_ADDR_OFFSET      (FLASH_IMAGE_1_ADDR_OFFSET + FLASH_IMAGE_SIZE)
+
+/******************************************************/
+/*                 External Functions                 */
+/******************************************************/
+
+/*
+ * The extern "C" is used here because other part of the libraries (Arduino) inserts it this way and thus the name reset_mcu is bound to C linkage
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern void reset_mcu( void );
+#ifdef __cplusplus
+}
+#endif
+
+
+/******************************************************/
+/*                 Configuration Items                */
+/******************************************************/
 
 bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t item_size )
 {
     /* Check the target is within the config space */
-    if( p_item_add < (uint8_t *)p_cache || ((uint8_t *)p_item_add + item_size) > (uint8_t *)p_cache + cache_size )
+    if( (uint8_t *)p_item_add < cache || ((uint8_t *)p_item_add + item_size) > cache + sizeof( cache ) )
     {
         return false;
     }
@@ -31,14 +55,21 @@ bool_t ConfigManager::item_validity_check( const void * p_item_add, uint16_t ite
     return true;
 }
 
-result_t ConfigManager::config_item_request( cfg_item_type_t item_type, const void ** pp_item )
+result_t ConfigManager::config_item_request( const void ** pp_config_item, uint16_t item_size )
 {
-    if( item_request_cb == nullptr )
+    uint32_t item_size_align = alignment_ceil( item_size, MCU_ALIGNMENT_SIZE );
+
+    /* Check the cache size */
+    if( ( p_cache_pointer - cache + item_size_align ) > (uint32_t)sizeof( cache ) )
     {
+        ASSERT_DYGMA( false, "failed - configuration cache size exceeded" );
         return RESULT_ERR;
     }
 
-    return item_request_cb( item_type, pp_item );
+    *pp_config_item = p_cache_pointer;
+    p_cache_pointer += item_size_align;
+
+    return RESULT_OK;
 }
 
 result_t ConfigManager::config_item_update( const void * p_config_item, const void * p_new_item, uint16_t item_size )
@@ -66,55 +97,24 @@ result_t ConfigManager::config_item_update( const void * p_config_item, const vo
 
 void ConfigManager::config_load( void )
 {
-    result_t result = RESULT_ERR;
-
-    result = EEPROM.read( 0, p_cache, cache_size );
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.read failed" );
-
-    UNUSED( result );
+    if( p_image_primary->is_valid() == true )
+    {
+        p_image_primary->data_load( cache, sizeof( cache ) );
+    }
+    else
+    {
+        /* The config image is invalid. Hence we clear the cache by filling it with 0xFF which comes from original flash-clear behavior and
+         * is generally accepted with config-dependent modules for detecting invalid/cleared configuration space */
+        memset( cache, 0xFF, sizeof(cache) );
+    }
 }
 
 void ConfigManager::config_save_request( void )
 {
     config_save_requested = true;
     timer_set_ms( &config_save_timer, CONFIG_SAVE_TIMEOUT_MS );
-}
 
-result_t ConfigManager::config_save( void )
-{
-    result_t result = RESULT_ERR;
-
-    result = EEPROM.erase();
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.erase failed" );
-    EXIT_IF_ERR( result, "EEPROM.erase failed" );
-
-    result = EEPROM.write( 0, p_cache, cache_size );
-    ASSERT_DYGMA( result == RESULT_OK, "EEPROM.write failed" );
-    EXIT_IF_ERR( result, "EEPROM.write failed" );
-
-_EXIT:
-    return result;
-}
-
-void ConfigManager::config_save_now( void )
-{
-    /* First, let the config machine finish its last operation */
-    while( machine_state != CONFIG_STATE_IDLE )
-    {
-        run();
-    }
-
-    /* Check if the configuration has changed and thus it makes sense to perform the save */
-    if( config_save_requested == false )
-    {
-        return;
-    }
-
-    /* Clear the flag */
-    config_save_requested = false;
-
-    /* Trigger the config save in the EEPROM */
-    config_save();
+    mcu_sleep_postpone();
 }
 
 /********************************************/
@@ -136,14 +136,9 @@ void ConfigManager::kbdmem_ll_init( void )
     UNUSED( result );
 }
 
-INLINE result_t ConfigManager::kbdmem_ll_item_request( kbdmem_item_type_t item_type, const void ** pp_item )
+INLINE result_t ConfigManager::kbdmem_ll_item_request( const void ** pp_config_item, uint16_t item_size )
 {
-    if( item_request_kbdmem_cb == nullptr )
-    {
-        return RESULT_ERR;
-    }
-
-    return item_request_kbdmem_cb( item_type, pp_item );
+    return config_item_request( pp_config_item, item_size );
 }
 
 INLINE result_t ConfigManager::kbdmem_ll_data_save( const void * p_mem_target, const void * p_data, uint16_t data_len )
@@ -151,11 +146,11 @@ INLINE result_t ConfigManager::kbdmem_ll_data_save( const void * p_mem_target, c
     return config_item_update( p_mem_target, p_data, data_len );
 }
 
-result_t ConfigManager::kbdmem_ll_item_request_cb( void * p_instance, kbdmem_item_type_t item_type, const void ** pp_item )
+result_t ConfigManager::kbdmem_ll_item_request_cb( void * p_instance, const void ** pp_config_item, uint16_t item_size )
 {
     ConfigManager * p_ConfigManager = ( ConfigManager *)p_instance;
 
-    return p_ConfigManager->kbdmem_ll_item_request( item_type, pp_item );
+    return p_ConfigManager->kbdmem_ll_item_request( pp_config_item, item_size );
 }
 
 result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * p_mem_target, const void * p_data, uint16_t data_len )
@@ -165,6 +160,41 @@ result_t ConfigManager::kbdmem_ll_data_save_cb( void * p_instance, const void * 
     return p_ConfigManager->kbdmem_ll_data_save( p_mem_target, p_data, data_len );
 }
 
+/********************************************/
+/*              Config Images               */
+/********************************************/
+
+INLINE result_t ConfigManager::images_init( void )
+{
+    result_t result = RESULT_ERR;
+
+    result = image_1.init( FLASH_IMAGE_1_ADDR_OFFSET, FLASH_IMAGE_SIZE );
+    EXIT_IF_ERR( result, "image_1.init failed" );
+
+    result = image_2.init( FLASH_IMAGE_2_ADDR_OFFSET, FLASH_IMAGE_SIZE );
+    EXIT_IF_ERR( result, "image_2.init failed" );
+
+    /* Resolve the primary image */
+    if( image_1.sequence_num_get() >= image_2.sequence_num_get() )
+    {
+        p_image_primary = &image_1;
+        p_image_secondary = &image_2;
+    }
+    else
+    {
+        p_image_primary = &image_2;
+        p_image_secondary = &image_1;
+    }
+
+_EXIT:
+    return result;
+}
+
+INLINE void ConfigManager::images_run( void )
+{
+    image_1.run( );
+    image_2.run( );
+}
 
 /********************************************/
 /*                 Machine                  */
@@ -181,23 +211,112 @@ INLINE void ConfigManager::machine_state_idle( void )
 {
     if( config_save_requested == true && timer_check( &config_save_timer ) == true )
     {
-        config_save_requested = false;
-        machine_state_set( CONFIG_STATE_SAVE );
+        machine_state_set( CONFIG_STATE_SAVE_START );
     }
 }
 
-INLINE void ConfigManager::machine_state_save( void )
+INLINE void ConfigManager::machine_state_save_start( void )
+{
+    /* Clear the configuration request flag */
+    config_save_requested = false;
+
+    /* We start with the secondary image, which has been previously recognized as the older one */
+    machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE );
+}
+
+INLINE void ConfigManager::machine_state_image_secondary_save( void )
 {
     result_t result = RESULT_ERR;
+    uint32_t sequence_num;
 
-    /* Update the brightness and return to the IDLE state */
-    result = config_save();
+    /* Use the sequence number as +1 to the primary image  */
+    sequence_num = p_image_primary->sequence_num_get() + 1;
+
+    result = p_image_secondary->save( cache, sizeof( cache ), sequence_num );
+    ASSERT_DYGMA( result != RESULT_ERR, "p_image_secondary->save failed" );
     EXIT_IF_NOK( result );
 
-    machine_state_set( CONFIG_STATE_IDLE );
+    machine_state_set( CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT );
 
 _EXIT:
     return;
+}
+
+INLINE void ConfigManager::machine_state_image_secondary_save_wait( void )
+{
+    if( p_image_secondary->is_busy() == true )
+    {
+        return;
+    }
+    else if( p_image_secondary->is_valid() == false )
+    {
+        ASSERT_DYGMA( false, "Config secondary image is not expected to be invalid after the save process finish." );
+
+        /* The image write is really not expected to end up with an invalid image in the memory. Instead of risking the
+         * primary image fails too, we reset the mcu here to preserve the primary image and, hopefully, resolve any
+         * unknown background causes of this issue. */
+        reset_mcu();
+
+        return;
+    }
+
+    /* The secondary image write was successful - move to the primary image save */
+    machine_state_set( CONFIG_STATE_IMAGE_PRIMARY_SAVE );
+}
+
+INLINE void ConfigManager::machine_state_image_primary_save( void )
+{
+    result_t result = RESULT_ERR;
+    uint32_t sequence_num;
+
+    /* Use the sequence number as +1 to the primary image  */
+    sequence_num = p_image_primary->sequence_num_get() + 1;
+
+    result = p_image_primary->save( cache, sizeof( cache ), sequence_num );
+    ASSERT_DYGMA( result != RESULT_ERR, "p_image_primary->save failed" );
+    EXIT_IF_NOK( result );
+
+    machine_state_set( CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT );
+
+_EXIT:
+    return;
+}
+
+INLINE void ConfigManager::machine_state_image_primary_save_wait( void )
+{
+    if( p_image_primary->is_busy() == true )
+    {
+        return;
+    }
+    else if( p_image_primary->is_valid() == false )
+    {
+        ASSERT_DYGMA( false, "Config primary image is not expected to be invalid after the save process finish." );
+
+        /* The image write is really not expected to end up with an invalid image in the memory. As the primary image
+         * is now invalid, we reset the mcu here to preserve the secondary image and, hopefully, resolve any
+         * unknown background causes of this issue. */
+        reset_mcu();
+
+        return;
+    }
+
+    /* The primary image write was successful - move to the save finish state */
+    machine_state_set( CONFIG_STATE_SAVE_FINISH );
+}
+
+INLINE void ConfigManager::machine_state_save_finish( void )
+{
+    /* Check the Primary and Secondary are same */
+    if( ConfigImage::image_compare( p_image_primary, p_image_secondary ) == false )
+    {
+        /* The primary and secondary images are not consistent, restart the images save process */
+        machine_state_set( CONFIG_STATE_SAVE_START );
+
+        return;
+    }
+
+    /* The configuration save is successful */
+    machine_state_set( CONFIG_STATE_IDLE );
 }
 
 INLINE void ConfigManager::machine( void )
@@ -210,9 +329,39 @@ INLINE void ConfigManager::machine( void )
 
             break;
 
-        case CONFIG_STATE_SAVE:
+        case CONFIG_STATE_SAVE_START:
 
-            machine_state_save();
+            machine_state_save_start();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_SECONDARY_SAVE:
+
+            machine_state_image_secondary_save();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_SECONDARY_SAVE_WAIT:
+
+            machine_state_image_secondary_save_wait();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_PRIMARY_SAVE:
+
+            machine_state_image_primary_save();
+
+            break;
+
+        case CONFIG_STATE_IMAGE_PRIMARY_SAVE_WAIT:
+
+            machine_state_image_primary_save_wait();
+
+            break;
+
+        case CONFIG_STATE_SAVE_FINISH:
+
+            machine_state_save_finish();
 
             break;
 
@@ -228,28 +377,20 @@ INLINE void ConfigManager::machine( void )
 /*                   API                    */
 /********************************************/
 
-result_t ConfigManager::init( const ConfigManager_config_t * p_config )
+result_t ConfigManager::init( void )
 {
     result_t result = RESULT_ERR;
 
-    /* Check the cache alignment */
-    if( (p_config->config_cache_size % EEPROM.align_get()) != 0 )
-    {
-        ASSERT_DYGMA( false, "The configuration cache is not aligned" );
-        return RESULT_ERR;
-    }
-
-    /* Save the configuration cache */
-    p_cache = p_config->p_config_cache;
-    cache_size = p_config->config_cache_size;
-
-    /* Save the callbacks */
-    item_request_cb = p_config->item_request_cb;
-    item_request_kbdmem_cb = p_config->item_request_kbdmem_cb;
+    /* Initialize the cache pointer */
+    p_cache_pointer = cache;
 
     /* Initialize the EEPROM */
     result = EEPROM.init();
     EXIT_IF_ERR( result, "EEPROM.init failed" );
+
+    /* Initialize the configuration images */
+    result = images_init();
+    EXIT_IF_ERR( result, "images_init failed" );
 
     /* Get the config image */
     config_load();
@@ -261,9 +402,22 @@ _EXIT:
     return result;
 }
 
+bool_t ConfigManager::is_busy( void )
+{
+    if( ( machine_state != CONFIG_STATE_IDLE ) || config_save_requested == true )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 void ConfigManager::run( void )
 {
     machine();
+    images_run();
 }
 
 class ConfigManager ConfigManager;

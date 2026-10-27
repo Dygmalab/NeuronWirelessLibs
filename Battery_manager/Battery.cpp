@@ -19,14 +19,13 @@
  */
 
 #include "Battery.h"
+#include "Ble_manager.h"
 #include "Communications.h"
 #include "Config_manager.h"
-#include "Kaleidoscope-FocusSerial.h"
-#include "LEDManager.h"
 #include "FirmwareVersion.h"
+#include "Kaleidoscope-FocusSerial.h"
 
 #include "kbd_if_manager.h"
-
 
 #define NOT_CHARGING 0
 
@@ -42,6 +41,8 @@ uint8_t Battery::battery_level_left = 100;
 uint8_t Battery::battery_level_right = 100;
 Battery::bat_status_side_t Battery::right = {4 , 0,0,false,0,false};
 Battery::bat_status_side_t Battery::left = {4 , 0,0,false,0,false}; 
+
+LEDManager::LEDManager_prio_lock_t Battery::LEDManager_prio_lock = 0;
 
 bool inline filterHand(Communications_protocol::Devices incomingDevice, bool right_or_left)
 {
@@ -65,7 +66,7 @@ result_t Battery::init()
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
     /* Get the battery savings mode configuration */
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_BATTERY, (const void **)&p_battery_conf );
+    result = ConfigManager.config_item_request( (const void **)&p_battery_conf, sizeof( battery_conf_t ) );
     EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
     /* Check if the config is cleared */
@@ -117,7 +118,7 @@ result_t Battery::init()
 
         uint16_t battery_level_mv;
         memcpy(&battery_level_mv, &packet.data[1], sizeof(battery_level_mv));
-        ble_battery_level_update(min(battery_level_left, battery_level_right));
+        BleManager.battery_level_update(min(battery_level_left, battery_level_right));
 
         #if DEBUG_LOG_BATTERY_MANAGER
         NRF_LOG_DEBUG("Battery level: %i device %i percentage %i mv",
@@ -148,7 +149,7 @@ result_t Battery::init()
             right.startDisconnect();
         }
 
-        ble_battery_level_update(min(battery_level_left, battery_level_right));
+        BleManager.battery_level_update(min(battery_level_left, battery_level_right));
     }));
 
     Communications.callbacks.bind(CONNECTED, ([this](Packet packet) {
@@ -291,14 +292,14 @@ kbdapi_event_result_t Battery::kbdif_key_event_cb( void * p_instance, kbdapi_key
 
     if ( p_key->toggled_on == true &&  FirmwareVersion::keyboard_is_wireless() )
     {
-        LEDManager.led_effect_set_prio( LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
+        LEDManager.led_effect_prio_set( &LEDManager_prio_lock, LEDEffect::LED_EFFECT_TYPE_BATTERY_LEVEL );
         LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, true );
     }
 
     if ( p_key->toggled_off == true )
     {
         LEDManager.update_brightness( LEDManager::BRIGHTNESS_LED_EFFECT_BATTERY_STATUS, false );
-        LEDManager.led_effect_reset_prio();
+        LEDManager.led_effect_prio_reset( &LEDManager_prio_lock );
         LEDManager.led_effect_set( LEDEffect::LED_EFFECT_TYPE_DEFAULT );
     }
 

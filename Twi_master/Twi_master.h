@@ -44,6 +44,8 @@ extern "C"
 {
 #endif
 
+#include "dl_middleware.h"
+
 #include <nrfx_twim.h>
 
 #ifdef __cplusplus
