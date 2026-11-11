@@ -125,8 +125,19 @@ class HID_ {
 
   uint8_t getShortName(char *name);
   int SendReport_(uint8_t id, const void* data, int len);
+
+  /* False over BLE until the connection event that carries the previous mouse report has finished. A report
+   * sent earlier would go out in the same connection event, so the cursor would move in bursts. */
+  bool mouseReportReady();
+
   Adafruit_USBD_HID usb_hid;
 private:
+  /* Mouse reports waiting in the TX FIFO */
+  uint16_t mouse_reports_queued = 0;
+  /* Radio event count when the last mouse report was handed over to BLE */
+  bool mouse_report_sent = false;
+  uint32_t mouse_report_radio_event = 0;
+
   char keyboarName[20] = "Defy RP2040";
 //  std::vector<uint8_t> descriptor;
 

@@ -109,6 +109,9 @@ int HID_::SendReport_(uint8_t id, const void *data, int len)
         NextReport nextReport{id, static_cast<uint16_t>(len)};
         tu_fifo_write_n(&tx_ff_hid, &nextReport, (uint16_t)(sizeof(nextReport)));
         tu_fifo_write_n(&tx_ff_hid, data, (uint16_t)len);
+
+        if (id == HID_REPORTID_MOUSE)
+            mouse_reports_queued++;
     }
 
     return 1;
@@ -133,16 +136,48 @@ bool HID_::SendLastReport()
         tu_fifo_peek_n(&tx_ff_hid, &nextReportWithData, (uint16_t)(sizeof(nextReportWithData.nextReport)) + nextReportWithData.nextReport.len);
 
         if (BleManager.is_connected())
+        {
             success = blehid_send_report(nextReportWithData.nextReport.id, (uint8_t *const)nextReportWithData.dataReport, nextReportWithData.nextReport.len);
+
+            /* The report goes out in the next connection event */
+            if (success && nextReportWithData.nextReport.id == HID_REPORTID_MOUSE)
+                mouse_report_sent = blecdev_radio_event_count_get(&mouse_report_radio_event);
+        }
         else
             success = usb_hid.sendReport(nextReportWithData.nextReport.id, nextReportWithData.dataReport, nextReportWithData.nextReport.len);
 
         if (success || (BleManager.is_enabled() && !BleManager.is_connected()) || (!BleManager.is_enabled() && TinyUSBDevice.suspended()))
         {
             tu_fifo_advance_read_pointer(&tx_ff_hid, (uint16_t)(sizeof(nextReportWithData.nextReport)) + nextReportWithData.nextReport.len);
+
+            if (nextReportWithData.nextReport.id == HID_REPORTID_MOUSE && mouse_reports_queued > 0)
+                mouse_reports_queued--;
         }
     }
+
+    /* The FIFO overwrites its oldest reports when it overflows, so the count can only be trusted again once it drains */
+    if (tu_fifo_count(&tx_ff_hid) == 0)
+        mouse_reports_queued = 0;
+
     return success;
+}
+
+bool HID_::mouseReportReady()
+{
+    /* USB takes a report every poll interval, and the reports sent there are paced by MouseKeys */
+    if (!BleManager.is_connected())
+        return true;
+
+    if (mouse_reports_queued != 0)
+        return false;
+
+    /* Without the radio notification there is no connection event to pace to */
+    uint32_t radio_event;
+    if (!mouse_report_sent || !blecdev_radio_event_count_get(&radio_event))
+        return true;
+
+    /* At least one connection event, the one that carried the previous report, has finished since it was handed over */
+    return radio_event != mouse_report_radio_event;
 }
 
 HID_::HID_() : protocol(HID_REPORT_PROTOCOL), idle(0)
