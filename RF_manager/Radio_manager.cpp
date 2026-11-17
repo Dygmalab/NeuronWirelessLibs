@@ -26,6 +26,10 @@
 
 #include "kbd_if_manager.h"
 
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+#include "nrf_log_default_backends.h"
+
 const RadioManager::rf_config_t * RadioManager::p_rf_config = nullptr;
 bool RadioManager::inited = false;
 uint16_t RadioManager::channel_hop;
@@ -37,7 +41,7 @@ result_t RadioManager::init()
     result = kbdif_initialize();
     EXIT_IF_ERR( result, "kbdif_initialize failed" );
 
-    result = ConfigManager.config_item_request( ConfigManager::CFG_ITEM_TYPE_RF, (const void **)&p_rf_config );
+    result = ConfigManager.config_item_request( (const void **)&p_rf_config, sizeof( rf_config_t ) );
     EXIT_IF_ERR( result, "ConfigManager.config_item_request failed" );
 
     /* Check if the config is cleared */
