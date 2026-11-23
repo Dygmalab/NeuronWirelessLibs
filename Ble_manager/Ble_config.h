@@ -74,8 +74,6 @@ class BleConfig
 
         typedef struct PACK
         {
-//            bool_t loaded;
-
             uint8_t channel_id;               /* The ID of the channel in the list of the channels */
             pm_peer_id_t peer_id;
             ble_device_addr_t device_addr;
@@ -114,14 +112,6 @@ class BleConfig
 
     private:
 
-//        typedef struct PACK
-//        {
-////            channel_t channels[BLE_CHANNELS_COUNT];
-////            ble_device_name_t device_name_local;    /* The local BLE device name */
-////            uint8_t current_channel_id;             /* The ID of the currently selected channel */
-////            bool_t force_ble;
-//        } ble_config_t;
-
         typedef struct PACK
         {
             uint32_t magic_number;
@@ -139,12 +129,9 @@ class BleConfig
             BLECFG_STATE_ENABLED,
             BLECFG_STATE_BOND_MAKE,
             BLECFG_STATE_BOND_MAKE_WAIT,
-//            BLECFG_STATE_LOAD_PEERS,
             BLECFG_STATE_PEER_ERASE,
             BLECFG_STATE_PEER_ERASE_WAIT,
         } blecfg_state_t;
-
-//        const ble_config_t * p_ble_config = nullptr;
 
         blecfg_state_t cfg_state;
 
@@ -181,27 +168,18 @@ class BleConfig
 
         inline void cfg_state_set( blecfg_state_t blecfg_state );
         inline void cfg_state_disabled_set( void );
-//        inline void cfg_state_load_peers_set( void );
-//        inline void cfg_state_peer_erase_set( pm_peer_id_t peer_id );
         inline void cfg_state_disabled_process( void );
         inline void cfg_state_enabled_process( void );
         inline void cfg_state_bond_make_process( void );
-//        inline void cfg_state_load_peers_process( void );
         inline void cfg_state_peer_erase_process( void );
         inline void cfg_state_machine( void );
 
         void cfgmem_ble_name_save( const ble_device_name_t * p_name_config, const ble_device_name_t * p_device_name );
 
-//        void cfgmem_channel_id_save( const channel_t * p_channel, uint8_t id );
-//        void cfgmem_channel_peer_id_save( const channel_t * p_channel, pm_peer_id_t peer_id );
-//        void cfgmem_channel_device_address_save( const channel_t * p_channel, const ble_device_addr_t * p_device_addr );
-//        void cfgmem_channel_device_name_save( const channel_t * p_channel, const ble_device_name_t * p_device_name );
-
         void cfgmem_device_name_local_save( const ble_device_name_t * p_device_name_local );
         void cfgmem_current_channel_id_save( uint8_t channel_id );
         void cfgmem_force_ble_save( bool_t force_ble );
 
-//        void cfgmem_channel_reset( const channel_t * p_channel, uint8_t id );
         void cfgmem_config_reset();
 
     private:
